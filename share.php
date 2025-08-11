@@ -15,8 +15,14 @@ if (empty($share_code)) {
 // 获取分享页信息
 $share_page = getSharePageByCode($share_code);
 
-// 获取活跃公告
-$active_announcements = getActiveAnnouncements();
+// 获取弹窗公告（只在分享页显示弹窗类型的公告）
+$popup_announcements = [];
+$all_announcements = getActiveAnnouncements();
+foreach ($all_announcements as $announcement) {
+    if ($announcement['is_popup']) {
+        $popup_announcements[] = $announcement;
+    }
+}
 
 if (!$share_page) {
     $error = '分享页不存在或已失效';
@@ -156,6 +162,26 @@ if (!$share_page) {
         .accordion-body p {
             line-height: 1.6;
         }
+        .announcement-content {
+            font-size: 1.1rem;
+            line-height: 1.7;
+        }
+        .announcement-content h1,
+        .announcement-content h2,
+        .announcement-content h3,
+        .announcement-content h4,
+        .announcement-content h5,
+        .announcement-content h6 {
+            color: #495057;
+            margin-top: 1rem;
+            margin-bottom: 0.8rem;
+        }
+        .announcement-content p {
+            margin-bottom: 1rem;
+        }
+        .announcement-content strong {
+            color: #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -237,30 +263,6 @@ if (!$share_page) {
                             </div>
                         </div>
                         
-                        <!-- 系统公告 -->
-                        <?php if (!empty($active_announcements)): ?>
-                        <div class="mt-4">
-                            <h5><i class="bi bi-megaphone text-info"></i> 系统公告</h5>
-                            <?php foreach ($active_announcements as $announcement): ?>
-                                <div class="alert alert-info mb-2">
-                                    <h6 class="mb-2"><?php echo htmlspecialchars($announcement['title']); ?></h6>
-                                    <div>
-                                        <?php
-                                        if ($announcement['content_type'] == 'markdown') {
-                                            echo parseMarkdown($announcement['content']);
-                                        } else {
-                                            echo $announcement['content'];
-                                        }
-                                        ?>
-                                    </div>
-                                    <?php if ($announcement['is_popup']): ?>
-                                        <small class="text-muted"><i class="bi bi-info-circle"></i> 弹窗公告</small>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <?php endif; ?>
-                        
                         <!-- 使用说明 -->
                         <div class="mt-4">
                             <h5><i class="bi bi-lightbulb"></i> 使用说明</h5>
@@ -330,30 +332,6 @@ if (!$share_page) {
                                 激活后账号信息将显示，有效期 <?php echo $share_page['duration_days']; ?> 天
                             </small>
                         </div>
-                        
-                        <!-- 系统公告 -->
-                        <?php if (!empty($active_announcements)): ?>
-                        <div class="mt-4">
-                            <h5><i class="bi bi-megaphone text-info"></i> 系统公告</h5>
-                            <?php foreach ($active_announcements as $announcement): ?>
-                                <div class="alert alert-info mb-2">
-                                    <h6 class="mb-2"><?php echo htmlspecialchars($announcement['title']); ?></h6>
-                                    <div>
-                                        <?php
-                                        if ($announcement['content_type'] == 'markdown') {
-                                            echo parseMarkdown($announcement['content']);
-                                        } else {
-                                            echo $announcement['content'];
-                                        }
-                                        ?>
-                                    </div>
-                                    <?php if ($announcement['is_popup']): ?>
-                                        <small class="text-muted"><i class="bi bi-info-circle"></i> 弹窗公告</small>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <?php endif; ?>
                         
                         <!-- 售后服务按钮 -->
                         <div class="mt-4 text-center">
@@ -547,6 +525,39 @@ if (!$share_page) {
         </div>
     </div>
 
+    <!-- 系统公告弹窗 -->
+    <?php foreach ($popup_announcements as $announcement): ?>
+        <div class="modal fade" id="announcement-<?php echo $announcement['id']; ?>" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-megaphone me-2"></i>
+                            <?php echo htmlspecialchars($announcement['title']); ?>
+                        </h5>
+                    </div>
+                    <div class="modal-body">
+                        <div class="announcement-content">
+                            <?php
+                            if ($announcement['content_type'] == 'markdown') {
+                                echo parseMarkdown($announcement['content']);
+                            } else {
+                                echo $announcement['content'];
+                            }
+                            ?>
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-primary btn-lg" data-bs-dismiss="modal">
+                            <i class="bi bi-check-circle me-1"></i>
+                            确定
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endforeach; ?>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // 复制到剪贴板
@@ -719,6 +730,14 @@ if (!$share_page) {
                 showToast('请打开微信手动搜索添加');
             }
         }
+        
+        // 显示弹窗公告
+        <?php foreach ($popup_announcements as $announcement): ?>
+            setTimeout(function() {
+                var modal = new bootstrap.Modal(document.getElementById('announcement-<?php echo $announcement['id']; ?>'));
+                modal.show();
+            }, 500);
+        <?php endforeach; ?>
     </script>
 </body>
 </html>
