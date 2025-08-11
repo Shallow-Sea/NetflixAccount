@@ -131,6 +131,31 @@ if (!$share_page) {
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
+        .accordion-button {
+            font-weight: 500;
+            border-radius: 10px !important;
+        }
+        .accordion-button:not(.collapsed) {
+            background-color: #e7f3ff;
+            border-color: #bee5eb;
+        }
+        .accordion-item {
+            border: 1px solid #dee2e6;
+            border-radius: 10px !important;
+            margin-bottom: 10px;
+        }
+        .accordion-body {
+            background-color: #f8f9fa;
+        }
+        .accordion-body h6 {
+            color: #495057;
+            font-weight: 600;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .accordion-body p {
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
@@ -349,6 +374,133 @@ if (!$share_page) {
                         <br>
                         创建时间: <?php echo $share_page['created_at']; ?>
                     </small>
+                </div>
+            </div>
+            
+            <!-- 使用帮助和常见问题 -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-question-circle-fill text-info me-2"></i>
+                        使用帮助和常见问题
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="helpAccordion">
+                        <!-- 地区不支持问题 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRegion">
+                                    <i class="bi bi-geo-alt-fill text-warning me-2"></i>
+                                    提示该地区不支持怎么办？
+                                </button>
+                            </h2>
+                            <div id="collapseRegion" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        如果显示该地区不支持，是因为魔法没有解锁流媒体
+                                    </div>
+                                    
+                                    <h6><i class="bi bi-phone me-2"></i>手机操作方法：</h6>
+                                    <p class="mb-3">关闭app，然后手机网络切换一下地区，换成<strong>美、新、台、日</strong>，切换成功之后再重新打开app登录。还是不行的话重启一下设备。</p>
+                                    
+                                    <h6><i class="bi bi-laptop me-2"></i>电脑操作方法：</h6>
+                                    <p class="mb-3">切换地区网络换<strong>美、新、台、日</strong>，切换成功之后清除浏览器缓存重新登录。或者浏览器开无痕模式登录。</p>
+                                    
+                                    <h6><i class="bi bi-tv me-2"></i>电视或苹果TV操作方法：</h6>
+                                    <p class="mb-0">建议重启设备，切换节点之后重新打开应用。</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 内容少的问题 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseContent">
+                                    <i class="bi bi-film text-primary me-2"></i>
+                                    为什么只能看到很少的剧（只有自制剧）？
+                                </button>
+                            </h2>
+                            <div id="collapseContent" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        资源随地区变化，内容是根据地区显示的
+                                    </div>
+                                    <p>很多地区不能完全解锁奈飞，所以只能看自制剧，会造成找的剧没有。<strong>建议多切换地区去尝试</strong>，更换其他地区即可获得更多内容。</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 到期提示问题 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExpiry">
+                                    <i class="bi bi-clock-fill text-success me-2"></i>
+                                    为什么提示几天后到期？
+                                </button>
+                            </h2>
+                            <div id="collapseExpiry" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <div class="alert alert-success">
+                                        <i class="bi bi-check-circle me-2"></i>
+                                        无需担心，该提示不影响观看，系统会自动续费
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 登录问题 -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLogin">
+                                    <i class="bi bi-shield-exclamation text-danger me-2"></i>
+                                    密码错误和登录问题解决办法
+                                </button>
+                            </h2>
+                            <div id="collapseLogin" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <div class="alert alert-danger">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        账号发您之前我们是试过没问题，提示密码错误的请尝试以下操作
+                                    </div>
+                                    
+                                    <h6><i class="bi bi-tv-fill me-2"></i>电视登录建议：</h6>
+                                    <p class="mb-3">电视对IP质量要求最高，建议在<strong>手机app登录后，手机通过相机扫描电视二维码登录</strong></p>
+                                    
+                                    <h6><i class="bi bi-exclamation-circle me-2"></i>出现"尝试登录次数过多"解决办法：</h6>
+                                    <div class="alert alert-warning">
+                                        频繁多次登录导致风控或当前网络问题，请等待晚点更换网络地区后再尝试<br>
+                                        <strong>建议40-60分钟后</strong>重试
+                                    </div>
+                                    
+                                    <h6>解决步骤：</h6>
+                                    <div class="mb-3">
+                                        <strong>第一步：</strong> 打开分享页面链接，刷新后，获取登录信息（选账号密码进行登录）
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <strong>第二步（根据设备选择）：</strong>
+                                        
+                                        <h6 class="mt-3"><i class="bi bi-phone me-2"></i>手机、iPad操作：</h6>
+                                        <p>关闭奈飞APP → 网络切换地区（推荐：<strong>港、新、台、日</strong>）→ 等待15秒 → 重新打开奈飞APP登录</p>
+                                        
+                                        <h6><i class="bi bi-laptop me-2"></i>电脑谷歌浏览器操作：</h6>
+                                        <p>清理浏览器缓存 → 网络切换地区（推荐：<strong>港、新、台、日</strong>）→ 等待15秒 → 重新打开网址登录</p>
+                                        
+                                        <h6><i class="bi bi-tv me-2"></i>电视、苹果TV操作：</h6>
+                                        <p>重启设备 → 网络切换地区（推荐：<strong>港、新、台、日</strong>）→ 等待15秒 → 重新打开应用</p>
+                                    </div>
+                                    
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-gear me-2"></i>
+                                        <strong>重要提示：</strong>一定要开启<strong>全局模式</strong>，非全局模式网络是自动的，切换地区是无效的
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         <?php endif; ?>
