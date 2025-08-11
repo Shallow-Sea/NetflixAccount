@@ -3,11 +3,8 @@ session_start();
 require_once 'config/database.php';
 require_once 'includes/functions.php';
 
-// 如果管理员已登录，重定向到后台
-if (isAdmin()) {
-    header('Location: Jahre/admin-dashboard.php');
-    exit;
-}
+// 如果访问根路径且管理员已登录，显示后台链接而不是自动跳转
+// 这样可以让管理员选择是查看前台还是进入后台
 
 // 获取弹窗公告（只获取弹窗类型的公告在首页显示）
 $popup_announcements = [];
