@@ -1,0 +1,21 @@
+DirectoryIndex index.php
+
+# 防止直接访问PHP文件（除了index.php）
+RewriteEngine On
+
+# 如果请求不是index.php，检查会话
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^.*$ index.php [QSA,L]
+
+# 确保所有文件以PHP方式处理
+<Files "*.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+# 禁止访问某些文件类型
+<FilesMatch "\.(inc|log|bak|backup|sql)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

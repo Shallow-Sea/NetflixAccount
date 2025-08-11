@@ -8,7 +8,7 @@ $error = '';
 $success = '';
 
 if (empty($share_code)) {
-    header('Location: login.php');
+    header('Location: index.php');
     exit;
 }
 
@@ -29,15 +29,21 @@ if (!$share_page) {
         }
     }
     
-    // 处理激活请求
-    if ($_POST['action'] ?? '' === 'activate' && !$share_page['is_activated']) {
-        if (activateSharePage($share_code)) { // 移除用户ID参数
-            // 重新获取分享页信息
-            $share_page = getSharePageByCode($share_code);
-            $success = '激活成功！账号信息已显示在下方。';
+    // 处理激活请求 - 添加POST请求检查避免刷新重复提交
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'activate' && !$share_page['is_activated']) {
+        if (activateSharePage($share_code)) {
+            // 激活成功后重定向到同一页面避免刷新重复提交
+            $redirect_url = $_SERVER['REQUEST_URI'];
+            header("Location: $redirect_url?activated=1");
+            exit;
         } else {
             $error = '激活失败，请稍后重试';
         }
+    }
+    
+    // 检查是否是激活成功后的重定向
+    if (isset($_GET['activated']) && $_GET['activated'] == '1') {
+        $success = '激活成功！账号信息已显示在下方。';
     }
 }
 ?>
@@ -135,7 +141,7 @@ if (!$share_page) {
                     <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 3rem;"></i>
                     <h3 class="mt-3 text-danger">出错了</h3>
                     <p class="text-muted"><?php echo $error; ?></p>
-                    <a href="login.php" class="btn btn-primary">返回首页</a>
+                    <a href="index.php" class="btn btn-primary">返回首页</a>
                 </div>
             </div>
         <?php else: ?>
@@ -211,7 +217,6 @@ if (!$share_page) {
                         <div class="mt-4">
                             <h5><i class="bi bi-megaphone text-info"></i> 系统公告</h5>
                             <?php foreach ($active_announcements as $announcement): ?>
-                                <?php if (!$announcement['is_popup']): ?>
                                 <div class="alert alert-info mb-2">
                                     <h6 class="mb-2"><?php echo htmlspecialchars($announcement['title']); ?></h6>
                                     <div>
@@ -223,8 +228,10 @@ if (!$share_page) {
                                         }
                                         ?>
                                     </div>
+                                    <?php if ($announcement['is_popup']): ?>
+                                        <small class="text-muted"><i class="bi bi-info-circle"></i> 弹窗公告</small>
+                                    <?php endif; ?>
                                 </div>
-                                <?php endif; ?>
                             <?php endforeach; ?>
                         </div>
                         <?php endif; ?>
@@ -304,7 +311,6 @@ if (!$share_page) {
                         <div class="mt-4">
                             <h5><i class="bi bi-megaphone text-info"></i> 系统公告</h5>
                             <?php foreach ($active_announcements as $announcement): ?>
-                                <?php if (!$announcement['is_popup']): ?>
                                 <div class="alert alert-info mb-2">
                                     <h6 class="mb-2"><?php echo htmlspecialchars($announcement['title']); ?></h6>
                                     <div>
@@ -316,8 +322,10 @@ if (!$share_page) {
                                         }
                                         ?>
                                     </div>
+                                    <?php if ($announcement['is_popup']): ?>
+                                        <small class="text-muted"><i class="bi bi-info-circle"></i> 弹窗公告</small>
+                                    <?php endif; ?>
                                 </div>
-                                <?php endif; ?>
                             <?php endforeach; ?>
                         </div>
                         <?php endif; ?>
@@ -510,28 +518,49 @@ if (!$share_page) {
                 copyWechatId();
                 showToast('请长按微信号进行复制');
             } else if (isMobile) {
-                // 移动端尝试打开微信
-                const wechatUrl = `weixin://contacts/profile/${wechatId}`;
+                // 移动端尝试多种方式打开微信
+                const wechatUrls = [
+                    `weixin://dl/business/?t=iJE7NKV79tU`, // 微信添加好友链接
+                    `weixin://contacts/profile/${wechatId}`, // 微信用户资料
+                    `wechat://contacts/profile/${wechatId}`, // 备用协议
+                    `weixin://` // 微信主页
+                ];
                 
-                // 创建隐藏链接尝试打开微信
-                const link = document.createElement('a');
-                link.href = wechatUrl;
-                link.style.display = 'none';
-                document.body.appendChild(link);
+                let tried = 0;
+                const tryNext = () => {
+                    if (tried < wechatUrls.length) {
+                        try {
+                            const link = document.createElement('a');
+                            link.href = wechatUrls[tried];
+                            link.style.display = 'none';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            tried++;
+                            
+                            // 如果尝试所有URL后仍无法打开，复制微信号
+                            setTimeout(() => {
+                                if (tried >= wechatUrls.length) {
+                                    copyWechatId();
+                                    showToast('无法直接打开微信，请手动搜索添加');
+                                } else {
+                                    tryNext();
+                                }
+                            }, 1000);
+                        } catch (e) {
+                            tried++;
+                            if (tried < wechatUrls.length) {
+                                tryNext();
+                            } else {
+                                copyWechatId();
+                                showToast('请手动打开微信搜索添加');
+                            }
+                        }
+                    }
+                };
                 
-                try {
-                    link.click();
-                    // 如果2秒后还在当前页面，说明没有微信应用
-                    setTimeout(() => {
-                        copyWechatId();
-                        showToast('请安装微信后手动搜索添加');
-                    }, 2000);
-                } catch (e) {
-                    copyWechatId();
-                    showToast('请手动打开微信搜索添加');
-                }
-                
-                document.body.removeChild(link);
+                tryNext();
             } else {
                 // 桌面端直接复制微信号
                 copyWechatId();

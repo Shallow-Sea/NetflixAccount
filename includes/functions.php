@@ -99,6 +99,14 @@ function updateNetflixAccountStatus($id, $status) {
 function createSharePage($netflix_account_id, $card_type, $user_id = null) {
     $pdo = getConnection();
     
+    // 如果账号ID为0，则随机选择一个活跃账号
+    if ($netflix_account_id === 0) {
+        $netflix_account_id = getRandomActiveAccount();
+        if (!$netflix_account_id) {
+            return false; // 没有可用的活跃账号
+        }
+    }
+    
     // 生成唯一的分享码
     do {
         $share_code = bin2hex(random_bytes(16));
@@ -116,6 +124,42 @@ function createSharePage($netflix_account_id, $card_type, $user_id = null) {
     }
     
     return false;
+}
+
+// 获取随机活跃账号ID (智能分发，避免同一账号被重复使用)
+function getRandomActiveAccount() {
+    $pdo = getConnection();
+    
+    // 获取所有活跃账号及其使用次数统计
+    $stmt = $pdo->prepare("
+        SELECT na.id, na.email, COUNT(sp.id) as usage_count 
+        FROM netflix_accounts na 
+        LEFT JOIN share_pages sp ON na.id = sp.netflix_account_id 
+        WHERE na.status = 'active' 
+        GROUP BY na.id, na.email 
+        ORDER BY usage_count ASC, RAND()
+    ");
+    $stmt->execute();
+    $accounts = $stmt->fetchAll();
+    
+    if (empty($accounts)) {
+        return false;
+    }
+    
+    // 如果有多个账号使用次数相同且最少，随机选择一个
+    $min_usage = $accounts[0]['usage_count'];
+    $candidates = [];
+    
+    foreach ($accounts as $account) {
+        if ($account['usage_count'] == $min_usage) {
+            $candidates[] = $account['id'];
+        } else {
+            break; // 因为已经按使用次数排序，后面的使用次数会更多
+        }
+    }
+    
+    // 从使用次数最少的候选账号中随机选择
+    return $candidates[array_rand($candidates)];
 }
 
 function activateSharePage($share_code) {
@@ -346,9 +390,23 @@ function getCardTypeDays($card_type) {
 function generateShareUrl($share_code) {
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'];
-    $path = dirname($_SERVER['REQUEST_URI']);
     
-    return "{$protocol}://{$host}{$path}/share.php?code={$share_code}";
+    // 检查当前是否在Jahre目录下，如果是则需要跳到上级目录
+    $current_dir = dirname($_SERVER['REQUEST_URI']);
+    if (strpos($current_dir, '/Jahre') !== false) {
+        // 在Jahre目录下，需要返回根目录
+        $base_path = str_replace('/Jahre', '', $current_dir);
+        if ($base_path === '') {
+            $base_path = '';
+        }
+    } else {
+        $base_path = $current_dir;
+    }
+    
+    // 确保路径格式正确
+    $base_path = rtrim($base_path, '/');
+    
+    return "{$protocol}://{$host}{$base_path}/share.php?code={$share_code}";
 }
 
 // 简单的Markdown解析器

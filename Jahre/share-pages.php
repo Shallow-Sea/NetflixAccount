@@ -10,35 +10,58 @@ $success = '';
 
 // 处理创建分享页
 if ($_POST['action'] ?? '' === 'create_share') {
-    $netflix_account_id = (int)($_POST['netflix_account_id'] ?? 0);
+    $netflix_account_id = (int)($_POST['netflix_account_id'] ?? -1);
     $card_type = sanitizeInput($_POST['card_type'] ?? 'month');
     $quantity = (int)($_POST['quantity'] ?? 1);
     
-    if ($netflix_account_id <= 0) {
-        $error = '请选择有效的Netflix账号';
+    if ($netflix_account_id < 0) {
+        $error = '请选择Netflix账号分配方式';
     } elseif ($quantity <= 0 || $quantity > 50) {
         $error = '生成数量必须在1-50之间';
     } else {
-        $generated_codes = [];
-        $failed_count = 0;
-        
-        for ($i = 0; $i < $quantity; $i++) {
-            $share_code = createSharePage($netflix_account_id, $card_type);
-            if ($share_code) {
-                $generated_codes[] = $share_code;
-            } else {
-                $failed_count++;
+        // 检查是否有活跃账号（当选择随机分配或指定账号时）
+        if ($netflix_account_id === 0) {
+            // 随机分配，检查是否有活跃账号
+            $active_accounts_check = getNetflixAccounts('active');
+            if (empty($active_accounts_check)) {
+                $error = '没有可用的活跃Netflix账号，请先添加账号';
+            }
+        } else {
+            // 指定账号，检查账号是否存在且活跃
+            $pdo = getConnection();
+            $stmt = $pdo->prepare("SELECT id FROM netflix_accounts WHERE id = ? AND status = 'active'");
+            $stmt->execute([$netflix_account_id]);
+            if (!$stmt->fetch()) {
+                $error = '选择的Netflix账号不存在或不可用';
             }
         }
         
-        if (count($generated_codes) > 0) {
-            $_SESSION['generated_codes'] = $generated_codes;
-            $success = "成功生成 " . count($generated_codes) . " 个分享页";
-            if ($failed_count > 0) {
-                $success .= "，失败 {$failed_count} 个";
+        if (!$error) {
+            $generated_codes = [];
+            $failed_count = 0;
+            
+            for ($i = 0; $i < $quantity; $i++) {
+                $share_code = createSharePage($netflix_account_id, $card_type);
+                if ($share_code) {
+                    $generated_codes[] = $share_code;
+                } else {
+                    $failed_count++;
+                }
             }
-        } else {
-            $error = '分享页生成失败';
+            
+            if (count($generated_codes) > 0) {
+                $_SESSION['generated_codes'] = $generated_codes;
+                if ($netflix_account_id === 0) {
+                    $success = "成功生成 " . count($generated_codes) . " 个分享页 (智能随机分配)";
+                } else {
+                    $success = "成功生成 " . count($generated_codes) . " 个分享页";
+                }
+                if ($failed_count > 0) {
+                    $success .= "，失败 {$failed_count} 个";
+                }
+            } else {
+                $error = '分享页生成失败，请检查是否有可用的活跃账号';
+            }
         }
     }
 }
@@ -422,13 +445,20 @@ $active_accounts = getNetflixAccounts('active');
                             <label for="netflix_account_id" class="form-label">选择Netflix账号</label>
                             <select class="form-control" id="netflix_account_id" name="netflix_account_id" required>
                                 <option value="">请选择账号</option>
-                                <?php foreach ($active_accounts as $account): ?>
-                                    <option value="<?php echo $account['id']; ?>">
-                                        <?php echo htmlspecialchars($account['email']); ?> 
-                                        (<?php echo ucfirst($account['subscription_type']); ?>)
-                                    </option>
-                                <?php endforeach; ?>
+                                <option value="0" selected>🎲 智能随机分配 (推荐)</option>
+                                <optgroup label="手动选择特定账号">
+                                    <?php foreach ($active_accounts as $account): ?>
+                                        <option value="<?php echo $account['id']; ?>">
+                                            <?php echo htmlspecialchars($account['email']); ?> 
+                                            (<?php echo ucfirst($account['subscription_type']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </optgroup>
                             </select>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> 
+                                推荐使用智能随机分配，系统将自动选择使用次数最少的账号，确保负载均衡
+                            </div>
                         </div>
                         
                         <div class="mb-3">
