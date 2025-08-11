@@ -3,19 +3,19 @@ session_start();
 require_once 'config/database.php';
 require_once 'includes/functions.php';
 
-// 检查是否已登录
-if (!isset($_SESSION['admin_id']) && !isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+// 如果管理员已登录，重定向到后台
+if (isAdmin()) {
+    header('Location: Jahre/admin-dashboard.php');
     exit;
 }
 
-// 获取用户信息
-if (isset($_SESSION['admin_id'])) {
-    $user_type = 'admin';
-    $user_info = getAdminById($_SESSION['admin_id']);
-} else {
-    $user_type = 'user';
-    $user_info = getUserById($_SESSION['user_id']);
+// 获取弹窗公告（只获取弹窗类型的公告在首页显示）
+$popup_announcements = [];
+$all_announcements = getActiveAnnouncements();
+foreach ($all_announcements as $announcement) {
+    if ($announcement['is_popup']) {
+        $popup_announcements[] = $announcement;
+    }
 }
 ?>
 
@@ -27,13 +27,86 @@ if (isset($_SESSION['admin_id'])) {
     <title>奈飞账号分享系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="assets/css/style.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .hero-section {
+            padding: 100px 0;
+            text-align: center;
+            color: white;
+        }
+        .netflix-logo {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #e50914;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 30px;
+        }
+        .hero-title {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .hero-subtitle {
+            font-size: 1.3rem;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+        .feature-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        .btn-custom {
+            background: linear-gradient(135deg, #e50914 0%, #b2070f 100%);
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(229, 9, 20, 0.3);
+        }
+        .stats-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 60px 0;
+            margin: 60px 0;
+        }
+        .stat-item {
+            text-align: center;
+            color: white;
+        }
+        .stat-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #e50914;
+        }
+        .announcement-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+    </style>
 </head>
 <body>
     <!-- 导航栏 -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: rgba(0,0,0,0.3);">
         <div class="container">
-            <a class="navbar-brand" href="index.php">
+            <a class="navbar-brand fw-bold" href="index.php">
                 <i class="bi bi-tv"></i> 奈飞分享系统
             </a>
             
@@ -42,241 +115,185 @@ if (isset($_SESSION['admin_id'])) {
             </button>
             
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <?php if ($user_type == 'admin'): ?>
+                <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="admin/accounts.php">
-                            <i class="bi bi-person-lines-fill"></i> 账号管理
-                        </a>
+                        <a class="nav-link" href="#features">功能特色</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="admin/users.php">
-                            <i class="bi bi-people"></i> 用户管理
+                        <a class="nav-link" href="Jahre/">
+                            <i class="bi bi-gear"></i> 管理后台
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="admin/share-pages.php">
-                            <i class="bi bi-share"></i> 分享页管理
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="admin/announcements.php">
-                            <i class="bi bi-megaphone"></i> 公告管理
-                        </a>
-                    </li>
-                    <?php endif; ?>
-                    
-                    <li class="nav-item">
-                        <a class="nav-link" href="share-pages.php">
-                            <i class="bi bi-link-45deg"></i> 我的分享页
-                        </a>
-                    </li>
-                </ul>
-                
-                <ul class="navbar-nav">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-person-circle"></i> 
-                            <?php echo htmlspecialchars($user_info['username']); ?>
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="profile.php">个人资料</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="logout.php">退出登录</a></li>
-                        </ul>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <!-- 主内容区 -->
-    <div class="container-fluid mt-4">
-        <div class="row">
-            <?php if ($user_type == 'admin'): ?>
-            <!-- 管理员仪表板 -->
-            <div class="col-12">
-                <div class="row">
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card border-left-primary shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                            活跃账号</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                            <?php echo getActiveAccountsCount(); ?>
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <i class="bi bi-tv text-primary fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card border-left-success shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                            注册用户</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                            <?php echo getTotalUsersCount(); ?>
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <i class="bi bi-people text-success fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card border-left-info shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                            活跃分享页</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                            <?php echo getActiveSharePagesCount(); ?>
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <i class="bi bi-share text-info fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card border-left-warning shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                            今日激活</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                            <?php echo getTodayActivationsCount(); ?>
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <i class="bi bi-check-circle text-warning fa-2x"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 最新激活记录 -->
-                <div class="card shadow mb-4">
-                    <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-primary">最新激活记录</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-bordered" width="100%" cellspacing="0">
-                                <thead>
-                                    <tr>
-                                        <th>分享码</th>
-                                        <th>用户</th>
-                                        <th>卡类型</th>
-                                        <th>激活时间</th>
-                                        <th>到期时间</th>
-                                        <th>IP地址</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $recent_activations = getRecentActivations(10);
-                                    foreach ($recent_activations as $activation):
-                                    ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($activation['share_code']); ?></td>
-                                        <td><?php echo htmlspecialchars($activation['username'] ?? '未知用户'); ?></td>
-                                        <td>
-                                            <span class="badge bg-primary">
-                                                <?php echo getCardTypeName($activation['card_type']); ?>
-                                            </span>
-                                        </td>
-                                        <td><?php echo $activation['activated_at']; ?></td>
-                                        <td><?php echo $activation['expires_at']; ?></td>
-                                        <td><?php echo htmlspecialchars($activation['activation_ip']); ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+    <!-- 英雄区域 -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="netflix-logo">NETFLIX</div>
+            <h1 class="hero-title">账号分享系统</h1>
+            <p class="hero-subtitle">
+                高质量的Netflix账号分享服务<br>
+                4K超清画质 · 多设备同步 · 全球内容库
+            </p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="#features" class="btn btn-custom text-white">
+                    <i class="bi bi-info-circle me-2"></i>
+                    了解更多
+                </a>
+                <a href="Jahre/" class="btn btn-outline-light btn-lg">
+                    <i class="bi bi-gear me-2"></i>
+                    管理后台
+                </a>
             </div>
-            <?php else: ?>
-            <!-- 用户仪表板 -->
-            <div class="col-12">
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i>
-                    欢迎使用奈飞账号分享系统！请点击"我的分享页"查看您的分享链接。
-                </div>
-            </div>
-            <?php endif; ?>
         </div>
-    </div>
+    </section>
 
-    <!-- 公告弹窗 -->
-    <?php
-    $active_announcements = getActiveAnnouncements();
-    foreach ($active_announcements as $announcement):
-        if ($announcement['is_popup']):
-    ?>
-    <div class="modal fade" id="announcement-<?php echo $announcement['id']; ?>" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><?php echo htmlspecialchars($announcement['title']); ?></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- 统计数据 -->
+    <section class="stats-section">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-3 col-6">
+                    <div class="stat-item">
+                        <div class="stat-number"><?php echo getActiveAccountsCount(); ?></div>
+                        <div>活跃账号</div>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <?php
-                    if ($announcement['content_type'] == 'markdown') {
-                        echo parseMarkdown($announcement['content']);
-                    } else {
-                        echo $announcement['content'];
-                    }
-                    ?>
+                <div class="col-md-3 col-6">
+                    <div class="stat-item">
+                        <div class="stat-number"><?php echo getTotalUsersCount(); ?></div>
+                        <div>注册用户</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="stat-item">
+                        <div class="stat-number"><?php echo getActiveSharePagesCount(); ?></div>
+                        <div>活跃分享</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="stat-item">
+                        <div class="stat-number"><?php echo getTodayActivationsCount(); ?></div>
+                        <div>今日激活</div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <?php 
-        endif;
-    endforeach; 
-    ?>
+    </section>
+
+    <!-- 功能特色 -->
+    <section id="features" class="py-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="text-center mb-3">
+                            <i class="bi bi-tv text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4 class="text-center mb-3">高清画质</h4>
+                        <p class="text-center text-muted">
+                            支持4K超高清画质，HDR技术，为您提供影院级的观影体验
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="text-center mb-3">
+                            <i class="bi bi-devices text-success" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4 class="text-center mb-3">多设备同步</h4>
+                        <p class="text-center text-muted">
+                            支持手机、电脑、电视等多种设备，随时随地享受精彩内容
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <div class="text-center mb-3">
+                            <i class="bi bi-globe text-info" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4 class="text-center mb-3">全球内容</h4>
+                        <p class="text-center text-muted">
+                            海量国际影视资源，热门剧集电影，满足不同观影需求
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="feature-card">
+                        <h5><i class="bi bi-shield-check text-success me-2"></i>安全可靠</h5>
+                        <p class="text-muted mb-0">采用先进的加密技术，保护您的账号安全，专业团队7×24小时监控维护</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card">
+                        <h5><i class="bi bi-headset text-primary me-2"></i>客服支持</h5>
+                        <p class="text-muted mb-0">专业的客服团队随时为您解答疑问，确保您的使用体验顺畅无忧</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- 底部 -->
+    <footer class="py-4" style="background: rgba(0,0,0,0.3);">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="text-white mb-0">
+                        © 2024 奈飞账号分享系统. 保留所有权利.
+                    </p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <a href="Jahre/" class="text-white-50 text-decoration-none">管理后台</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 弹窗公告 -->
+    <?php foreach ($popup_announcements as $announcement): ?>
+        <div class="modal fade" id="announcement-<?php echo $announcement['id']; ?>" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><?php echo htmlspecialchars($announcement['title']); ?></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <?php
+                        if ($announcement['content_type'] == 'markdown') {
+                            echo parseMarkdown($announcement['content']);
+                        } else {
+                            echo $announcement['content'];
+                        }
+                        ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endforeach; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/main.js"></script>
     
-    <!-- 显示公告弹窗 -->
+    <!-- 弹窗公告脚本 -->
     <script>
-    <?php foreach ($active_announcements as $announcement): ?>
-        <?php if ($announcement['is_popup']): ?>
-        setTimeout(function() {
-            var modal = new bootstrap.Modal(document.getElementById('announcement-<?php echo $announcement['id']; ?>'));
-            modal.show();
-        }, 1000);
-        
-        // 自动关闭弹窗
-        setTimeout(function() {
-            var modal = bootstrap.Modal.getInstance(document.getElementById('announcement-<?php echo $announcement['id']; ?>'));
-            if (modal) modal.hide();
-        }, <?php echo $announcement['popup_duration'] + 1000; ?>);
-        <?php endif; ?>
-    <?php endforeach; ?>
+        <?php foreach ($popup_announcements as $announcement): ?>
+            setTimeout(function() {
+                var modal = new bootstrap.Modal(document.getElementById('announcement-<?php echo $announcement['id']; ?>'));
+                modal.show();
+            }, 1000);
+            
+            setTimeout(function() {
+                var modal = bootstrap.Modal.getInstance(document.getElementById('announcement-<?php echo $announcement['id']; ?>'));
+                if (modal) modal.hide();
+            }, <?php echo $announcement['popup_duration'] + 1000; ?>);
+        <?php endforeach; ?>
     </script>
 </body>
 </html>

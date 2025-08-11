@@ -15,6 +15,9 @@ if (empty($share_code)) {
 // 获取分享页信息
 $share_page = getSharePageByCode($share_code);
 
+// 获取活跃公告
+$active_announcements = getActiveAnnouncements();
+
 if (!$share_page) {
     $error = '分享页不存在或已失效';
 } else {
@@ -28,9 +31,7 @@ if (!$share_page) {
     
     // 处理激活请求
     if ($_POST['action'] ?? '' === 'activate' && !$share_page['is_activated']) {
-        $user_id = $_SESSION['user_id'] ?? null;
-        
-        if (activateSharePage($share_code, $user_id)) {
+        if (activateSharePage($share_code)) { // 移除用户ID参数
             // 重新获取分享页信息
             $share_page = getSharePageByCode($share_code);
             $success = '激活成功！账号信息已显示在下方。';
@@ -205,6 +206,29 @@ if (!$share_page) {
                             </div>
                         </div>
                         
+                        <!-- 系统公告 -->
+                        <?php if (!empty($active_announcements)): ?>
+                        <div class="mt-4">
+                            <h5><i class="bi bi-megaphone text-info"></i> 系统公告</h5>
+                            <?php foreach ($active_announcements as $announcement): ?>
+                                <?php if (!$announcement['is_popup']): ?>
+                                <div class="alert alert-info mb-2">
+                                    <h6 class="mb-2"><?php echo htmlspecialchars($announcement['title']); ?></h6>
+                                    <div>
+                                        <?php
+                                        if ($announcement['content_type'] == 'markdown') {
+                                            echo parseMarkdown($announcement['content']);
+                                        } else {
+                                            echo $announcement['content'];
+                                        }
+                                        ?>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                        
                         <!-- 使用说明 -->
                         <div class="mt-4">
                             <h5><i class="bi bi-lightbulb"></i> 使用说明</h5>
@@ -212,8 +236,16 @@ if (!$share_page) {
                                 <li><i class="bi bi-check text-success me-2"></i> 请在到期前充分使用此账号</li>
                                 <li><i class="bi bi-check text-success me-2"></i> 请勿修改账号密码或个人信息</li>
                                 <li><i class="bi bi-check text-success me-2"></i> 建议创建独立的用户配置文件</li>
-                                <li><i class="bi bi-check text-success me-2"></i> 如遇问题请及时联系客服</li>
+                                <li><i class="bi bi-check text-success me-2"></i> 如遇问题请点击下方售后按钮联系客服</li>
                             </ul>
+                        </div>
+                        
+                        <!-- 售后服务按钮 -->
+                        <div class="mt-4 text-center">
+                            <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#customerServiceModal">
+                                <i class="bi bi-headset me-2"></i>
+                                售后服务
+                            </button>
                         </div>
                         
                         <!-- Netflix登录链接 -->
@@ -266,6 +298,37 @@ if (!$share_page) {
                                 激活后账号信息将显示，有效期 <?php echo $share_page['duration_days']; ?> 天
                             </small>
                         </div>
+                        
+                        <!-- 系统公告 -->
+                        <?php if (!empty($active_announcements)): ?>
+                        <div class="mt-4">
+                            <h5><i class="bi bi-megaphone text-info"></i> 系统公告</h5>
+                            <?php foreach ($active_announcements as $announcement): ?>
+                                <?php if (!$announcement['is_popup']): ?>
+                                <div class="alert alert-info mb-2">
+                                    <h6 class="mb-2"><?php echo htmlspecialchars($announcement['title']); ?></h6>
+                                    <div>
+                                        <?php
+                                        if ($announcement['content_type'] == 'markdown') {
+                                            echo parseMarkdown($announcement['content']);
+                                        } else {
+                                            echo $announcement['content'];
+                                        }
+                                        ?>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- 售后服务按钮 -->
+                        <div class="mt-4 text-center">
+                            <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#customerServiceModal">
+                                <i class="bi bi-headset me-2"></i>
+                                售后服务
+                            </button>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -281,6 +344,47 @@ if (!$share_page) {
                 </div>
             </div>
         <?php endif; ?>
+    </div>
+
+    <!-- 售后服务弹窗 -->
+    <div class="modal fade" id="customerServiceModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-headset me-2"></i>
+                        售后服务
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-4">
+                        <i class="bi bi-wechat text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    
+                    <h4 class="mb-3">售后微信</h4>
+                    
+                    <div class="card bg-light p-3 mb-4">
+                        <h3 class="text-primary mb-0" id="wechatId">CatCar88</h3>
+                    </div>
+                    
+                    <p class="text-muted mb-4">
+                        <i class="bi bi-info-circle me-1"></i>
+                        如有任何问题，请添加微信联系客服
+                    </p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-outline-primary me-2" onclick="copyWechatId()">
+                        <i class="bi bi-clipboard me-1"></i>
+                        复制微信号
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="openWechat()">
+                        <i class="bi bi-wechat me-1"></i>
+                        跳转微信
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -357,6 +461,82 @@ if (!$share_page) {
         if (document.getElementById('countdown')) {
             updateCountdown();
             setInterval(updateCountdown, 1000);
+        }
+        
+        // 复制微信号
+        function copyWechatId() {
+            const wechatId = 'CatCar88';
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(wechatId).then(function() {
+                    showToast('微信号已复制到剪贴板');
+                }).catch(function() {
+                    fallbackCopy(wechatId);
+                });
+            } else {
+                fallbackCopy(wechatId);
+            }
+        }
+        
+        // 备用复制方法
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                showToast('微信号已复制到剪贴板');
+            } catch (err) {
+                showToast('复制失败，请手动复制');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+        
+        // 跳转微信
+        function openWechat() {
+            const wechatId = 'CatCar88';
+            
+            // 检测设备类型和浏览器
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+            
+            if (isWeChat) {
+                // 在微信内部，直接复制微信号
+                copyWechatId();
+                showToast('请长按微信号进行复制');
+            } else if (isMobile) {
+                // 移动端尝试打开微信
+                const wechatUrl = `weixin://contacts/profile/${wechatId}`;
+                
+                // 创建隐藏链接尝试打开微信
+                const link = document.createElement('a');
+                link.href = wechatUrl;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                
+                try {
+                    link.click();
+                    // 如果2秒后还在当前页面，说明没有微信应用
+                    setTimeout(() => {
+                        copyWechatId();
+                        showToast('请安装微信后手动搜索添加');
+                    }, 2000);
+                } catch (e) {
+                    copyWechatId();
+                    showToast('请手动打开微信搜索添加');
+                }
+                
+                document.body.removeChild(link);
+            } else {
+                // 桌面端直接复制微信号
+                copyWechatId();
+                showToast('请打开微信手动搜索添加');
+            }
         }
     </script>
 </body>

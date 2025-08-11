@@ -118,7 +118,7 @@ function createSharePage($netflix_account_id, $card_type, $user_id = null) {
     return false;
 }
 
-function activateSharePage($share_code, $user_id = null) {
+function activateSharePage($share_code) {
     $pdo = getConnection();
     
     // 获取分享页信息
@@ -133,17 +133,17 @@ function activateSharePage($share_code, $user_id = null) {
     // 计算到期时间
     $expires_at = date('Y-m-d H:i:s', strtotime("+{$share_page['duration_days']} days"));
     
-    // 更新分享页状态
-    $stmt = $pdo->prepare("UPDATE share_pages SET is_activated = TRUE, activated_at = NOW(), expires_at = ?, user_id = ? WHERE id = ?");
-    $result = $stmt->execute([$expires_at, $user_id, $share_page['id']]);
+    // 更新分享页状态（不再关联用户）
+    $stmt = $pdo->prepare("UPDATE share_pages SET is_activated = TRUE, activated_at = NOW(), expires_at = ? WHERE id = ?");
+    $result = $stmt->execute([$expires_at, $share_page['id']]);
     
     if ($result) {
-        // 记录激活日志
+        // 记录激活日志（不再记录用户ID）
         $activation_ip = $_SERVER['REMOTE_ADDR'];
         $user_agent = $_SERVER['HTTP_USER_AGENT'];
         
-        $stmt = $pdo->prepare("INSERT INTO activation_logs (share_page_id, user_id, activation_ip, user_agent) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$share_page['id'], $user_id, $activation_ip, $user_agent]);
+        $stmt = $pdo->prepare("INSERT INTO activation_logs (share_page_id, activation_ip, user_agent) VALUES (?, ?, ?)");
+        $stmt->execute([$share_page['id'], $activation_ip, $user_agent]);
         
         return true;
     }

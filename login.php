@@ -3,9 +3,9 @@ session_start();
 require_once 'config/database.php';
 require_once 'includes/functions.php';
 
-// 如果已经登录，重定向到主页
-if (isLoggedIn()) {
-    header('Location: index.php');
+// 如果管理员已经登录，重定向到后台
+if (isAdmin()) {
+    header('Location: Jahre/admin-dashboard.php');
     exit;
 }
 
@@ -21,45 +21,24 @@ if (!isDatabaseInitialized()) {
     }
 }
 
-// 处理登录请求
+// 处理管理员登录请求
 if ($_POST['action'] ?? '' === 'login') {
     $username = sanitizeInput($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
-    $is_admin = isset($_POST['is_admin']);
     
     if (empty($username) || empty($password)) {
         $error = '请输入用户名和密码';
     } else {
-        if (login($username, $password, $is_admin)) {
-            header('Location: index.php');
+        if (login($username, $password, true)) { // 只允许管理员登录
+            header('Location: Jahre/admin-dashboard.php');
             exit;
         } else {
-            $error = '用户名或密码错误';
+            $error = '管理员用户名或密码错误';
         }
     }
 }
 
-// 处理注册请求
-if ($_POST['action'] ?? '' === 'register') {
-    $username = sanitizeInput($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $confirm_password = $_POST['confirm_password'] ?? '';
-    $email = sanitizeInput($_POST['email'] ?? '');
-    
-    if (empty($username) || empty($password)) {
-        $error = '请输入用户名和密码';
-    } elseif ($password !== $confirm_password) {
-        $error = '两次输入的密码不一致';
-    } elseif (strlen($password) < 6) {
-        $error = '密码长度至少为6位';
-    } else {
-        if (registerUser($username, $password, $email)) {
-            $success = '注册成功，请登录';
-        } else {
-            $error = '注册失败，用户名可能已存在';
-        }
-    }
-}
+// 移除普通用户注册功能
 ?>
 
 <!DOCTYPE html>
@@ -136,23 +115,12 @@ if ($_POST['action'] ?? '' === 'register') {
                             </div>
                         <?php endif; ?>
                         
-                        <!-- 导航标签 -->
-                        <ul class="nav nav-pills nav-justified mx-4 mt-4" id="authTabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="login-tab" data-bs-toggle="pill" data-bs-target="#login" type="button" role="tab">
-                                    <i class="bi bi-box-arrow-in-right me-1"></i> 登录
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="register-tab" data-bs-toggle="pill" data-bs-target="#register" type="button" role="tab">
-                                    <i class="bi bi-person-plus me-1"></i> 注册
-                                </button>
-                            </li>
-                        </ul>
-                        
-                        <div class="tab-content" id="authTabContent">
-                            <!-- 登录表单 -->
-                            <div class="tab-pane fade show active" id="login" role="tabpanel">
+                        <!-- 管理员登录 -->
+                        <div class="mx-4 mt-4">
+                            <div class="text-center mb-4">
+                                <h4 class="text-primary">管理员登录</h4>
+                                <p class="text-muted">请使用管理员账号登录后台</p>
+                            </div>
                                 <form method="POST">
                                     <input type="hidden" name="action" value="login">
                                     
@@ -176,70 +144,18 @@ if ($_POST['action'] ?? '' === 'register') {
                                         </div>
                                     </div>
                                     
-                                    <div class="mb-3 form-check">
-                                        <input type="checkbox" class="form-check-input" id="is_admin" name="is_admin">
-                                        <label class="form-check-label" for="is_admin">
-                                            管理员登录
-                                        </label>
-                                    </div>
                                     
                                     <div class="d-grid">
                                         <button type="submit" class="btn btn-primary">
-                                            <i class="bi bi-box-arrow-in-right me-1"></i> 登录
+                                            <i class="bi bi-shield-lock me-1"></i> 管理员登录
                                         </button>
                                     </div>
-                                </form>
-                            </div>
-                            
-                            <!-- 注册表单 -->
-                            <div class="tab-pane fade" id="register" role="tabpanel">
-                                <form method="POST">
-                                    <input type="hidden" name="action" value="register">
                                     
-                                    <div class="mb-3">
-                                        <label for="reg_username" class="form-label">用户名</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">
-                                                <i class="bi bi-person"></i>
-                                            </span>
-                                            <input type="text" class="form-control" id="reg_username" name="username" required>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label for="reg_email" class="form-label">邮箱（可选）</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">
-                                                <i class="bi bi-envelope"></i>
-                                            </span>
-                                            <input type="email" class="form-control" id="reg_email" name="email">
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label for="reg_password" class="form-label">密码</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">
-                                                <i class="bi bi-lock"></i>
-                                            </span>
-                                            <input type="password" class="form-control" id="reg_password" name="password" minlength="6" required>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label for="confirm_password" class="form-label">确认密码</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">
-                                                <i class="bi bi-lock-fill"></i>
-                                            </span>
-                                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="6" required>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="d-grid">
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="bi bi-person-plus me-1"></i> 注册
-                                        </button>
+                                    <div class="text-center mt-3">
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle"></i>
+                                            只有管理员可以登录后台管理系统
+                                        </small>
                                     </div>
                                 </form>
                             </div>
