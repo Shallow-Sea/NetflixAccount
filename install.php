@@ -18,20 +18,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $username = trim($_POST['db_username'] ?? 'root');
         $password = $_POST['db_password'] ?? ''; // 密码可能为空，不要trim
         
-        // 调试信息（临时使用，生产环境应删除）
-        if (empty($password)) {
-            $error = '数据库密码为空，请检查密码字段是否正确填写';
-        } else {
-            try {
-                // 先测试数据库连接
-                $dsn = "mysql:host=$host;charset=utf8mb4";
-                $pdo = new PDO($dsn, $username, $password, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-                ]);
-                
-                // 创建数据库
-                $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-                $pdo->exec("USE `$dbname`");
+        // 数据库连接测试（密码可以为空）
+        try {
+            // 先测试数据库连接
+            $dsn = "mysql:host=$host;charset=utf8mb4";
+            $pdo = new PDO($dsn, $username, $password, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+            ]);
+            
+            // 创建数据库
+            $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $pdo->exec("USE `$dbname`");
             
             // 检查config目录是否存在，不存在则创建
             if (!is_dir('config')) {
@@ -83,12 +80,11 @@ class Database {
                 throw new Exception('无法写入数据库配置文件，请检查config目录权限');
             }
             
-                $step = 2;
-            } catch (PDOException $e) {
-                $error = '数据库连接失败: ' . $e->getMessage() . '（请检查数据库主机、用户名、密码是否正确）';
-            } catch (Exception $e) {
-                $error = $e->getMessage();
-            }
+            $step = 2;
+        } catch (PDOException $e) {
+            $error = '数据库连接失败: ' . $e->getMessage() . '（请检查数据库主机、用户名、密码是否正确）';
+        } catch (Exception $e) {
+            $error = $e->getMessage();
         }
     } elseif ($step == 2) {
         // 创建数据表和初始数据
