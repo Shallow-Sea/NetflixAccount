@@ -8,6 +8,11 @@ checkAdminAccess();
 $error = '';
 $success = '';
 
+// 处理URL中的错误参数
+if (isset($_GET['error'])) {
+    $error = urldecode($_GET['error']);
+}
+
 // 处理创建分享页
 if ($_POST['action'] ?? '' === 'create_share') {
     $netflix_account_id_raw = $_POST['netflix_account_id'] ?? '';
@@ -180,39 +185,41 @@ if ($_GET['action'] ?? '' === 'export_generated') {
     $format = $_GET['format'] ?? 'txt';
     
     if (empty($codes)) {
-        $error = '没有可导出的分享页';
-    } else {
-        // 获取分享页详细信息
-        $pdo = getConnection();
-        $placeholders = implode(',', array_fill(0, count($codes), '?'));
-        $stmt = $pdo->prepare("
-            SELECT sp.share_code, sp.card_type, sp.created_at, na.email as netflix_email
-            FROM share_pages sp
-            LEFT JOIN netflix_accounts na ON sp.netflix_account_id = na.id
-            WHERE sp.share_code IN ($placeholders)
-            ORDER BY sp.created_at DESC
-        ");
-        $stmt->execute($codes);
-        $share_pages = $stmt->fetchAll();
-        
-        $filename = 'generated_shares_' . date('Y-m-d_H-i-s');
-        
-        switch ($format) {
-            case 'csv':
-                header('Content-Type: text/csv; charset=utf-8');
-                header("Content-Disposition: attachment; filename=\"{$filename}.csv\"");
-                echo "\xEF\xBB\xBF"; // UTF-8 BOM
-                echo exportGeneratedToCSV($share_pages);
-                break;
-            case 'txt':
-            default:
-                header('Content-Type: text/plain; charset=utf-8');
-                header("Content-Disposition: attachment; filename=\"{$filename}.txt\"");
-                echo "\xEF\xBB\xBF"; // UTF-8 BOM
-                echo exportGeneratedToTXT($share_pages);
-        }
+        // 重定向回页面并显示错误
+        header('Location: share-pages.php?error=' . urlencode('没有可导出的分享页'));
         exit;
     }
+    
+    // 获取分享页详细信息
+    $pdo = getConnection();
+    $placeholders = implode(',', array_fill(0, count($codes), '?'));
+    $stmt = $pdo->prepare("
+        SELECT sp.share_code, sp.card_type, sp.created_at, na.email as netflix_email
+        FROM share_pages sp
+        LEFT JOIN netflix_accounts na ON sp.netflix_account_id = na.id
+        WHERE sp.share_code IN ($placeholders)
+        ORDER BY sp.created_at DESC
+    ");
+    $stmt->execute($codes);
+    $share_pages = $stmt->fetchAll();
+    
+    $filename = 'generated_shares_' . date('Y-m-d_H-i-s');
+    
+    switch ($format) {
+        case 'csv':
+            header('Content-Type: text/csv; charset=utf-8');
+            header("Content-Disposition: attachment; filename=\"{$filename}.csv\"");
+            echo "\xEF\xBB\xBF"; // UTF-8 BOM
+            echo exportGeneratedToCSV($share_pages);
+            break;
+        case 'txt':
+        default:
+            header('Content-Type: text/plain; charset=utf-8');
+            header("Content-Disposition: attachment; filename=\"{$filename}.txt\"");
+            echo "\xEF\xBB\xBF"; // UTF-8 BOM
+            echo exportGeneratedToTXT($share_pages);
+    }
+    exit;
 }
 
 // 处理批量导出
