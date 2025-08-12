@@ -360,6 +360,7 @@ try {
         $error = '获取Netflix账号失败: ' . $e->getMessage();
     }
 }
+echo "<!-- DEBUG: 开始HTML渲染 -->\n";
 ?>
 
 <!DOCTYPE html>
@@ -467,7 +468,9 @@ try {
                 <?php endif; ?>
 
                 <!-- 显示生成的分享码 -->
+                <?php echo "<!-- DEBUG: 检查生成的分享码 -->\n"; ?>
                 <?php if (isset($_SESSION['generated_codes'])): ?>
+                    <?php echo "<!-- DEBUG: 有生成的分享码，开始渲染 -->\n"; ?>
                     <div class="card mb-4">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">新生成的分享链接</h5>
@@ -482,7 +485,9 @@ try {
                         </div>
                         <div class="card-body">
                             <div class="row">
+                                <?php echo "<!-- DEBUG: 开始循环生成的分享码 -->\n"; ?>
                                 <?php foreach ($_SESSION['generated_codes'] as $code): ?>
+                                    <?php echo "<!-- DEBUG: 处理分享码: " . htmlspecialchars($code) . " -->\n"; ?>
                                     <div class="col-md-6 mb-2">
                                         <div class="input-group">
                                             <?php 
@@ -503,6 +508,9 @@ try {
                         </div>
                     </div>
                     <?php unset($_SESSION['generated_codes']); ?>
+                    <?php echo "<!-- DEBUG: 生成的分享码部分渲染完成 -->\n"; ?>
+                <?php else: ?>
+                    <?php echo "<!-- DEBUG: 没有生成的分享码 -->\n"; ?>
                 <?php endif; ?>
 
                 <!-- 搜索和过滤器 -->
@@ -596,7 +604,9 @@ try {
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <?php echo "<!-- DEBUG: 开始循环分享页列表，共 " . count($share_pages) . " 条记录 -->\n"; ?>
                                     <?php foreach ($share_pages as $page): ?>
+                                        <?php echo "<!-- DEBUG: 处理分享页ID: " . $page['id'] . " -->\n"; ?>
                                         <?php
                                         $is_active = $page['is_activated'] && $page['expires_at'] && strtotime($page['expires_at']) > time();
                                         $is_expired = $page['is_activated'] && $page['expires_at'] && strtotime($page['expires_at']) <= time();
@@ -687,6 +697,7 @@ try {
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
+                                    <?php echo "<!-- DEBUG: 分享页列表循环完成 -->\n"; ?>
                                 </tbody>
                             </table>
                         </div>
