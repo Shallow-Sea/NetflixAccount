@@ -1,8 +1,4 @@
 <?php
-// 临时启用错误显示
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 session_start();
 require_once '../config/database.php';
 require_once '../includes/functions.php';
@@ -261,7 +257,6 @@ if ($_GET['action'] ?? '' === 'export') {
 }
 
 // 获取分享页列表
-echo "<!-- DEBUG: 开始获取分享页列表 -->\n";
 $pdo = getConnection();
 
 // 分页参数
@@ -301,7 +296,6 @@ if ($search) {
 }
 
 $where_clause = $where_conditions ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
-echo "<!-- DEBUG: WHERE条件: $where_clause, 参数数量: " . count($params) . " -->\n";
 
 // 获取总数
 $count_sql = "
@@ -311,14 +305,11 @@ $count_sql = "
     LEFT JOIN users u ON sp.user_id = u.id
     {$where_clause}
 ";
-echo "<!-- DEBUG: 准备执行COUNT查询 -->\n";
 try {
     $count_stmt = $pdo->prepare($count_sql);
     $count_stmt->execute($params);
     $total_count = $count_stmt->fetchColumn();
-    echo "<!-- DEBUG: COUNT查询成功，总数: $total_count -->\n";
 } catch (Exception $e) {
-    echo "<!-- DEBUG: COUNT查询失败: " . $e->getMessage() . " -->\n";
     $error = '获取分享页总数失败: ' . $e->getMessage();
     $total_count = 0;
 }
@@ -334,14 +325,11 @@ $sql = "
     ORDER BY sp.created_at DESC
     LIMIT {$per_page} OFFSET {$offset}
 ";
-echo "<!-- DEBUG: 准备执行主查询 -->\n";
 try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $share_pages = $stmt->fetchAll();
-    echo "<!-- DEBUG: 主查询成功，返回 " . count($share_pages) . " 条记录 -->\n";
 } catch (Exception $e) {
-    echo "<!-- DEBUG: 主查询失败: " . $e->getMessage() . " -->\n";
     $error = '获取分享页列表失败: ' . $e->getMessage();
     $share_pages = [];
 }
@@ -349,18 +337,14 @@ try {
 $total_pages = ceil($total_count / $per_page);
 
 // 获取Netflix账号列表用于创建分享页
-echo "<!-- DEBUG: 准备获取Netflix账号 -->\n";
 try {
     $active_accounts = getNetflixAccounts('active');
-    echo "<!-- DEBUG: 获取Netflix账号成功，共 " . count($active_accounts) . " 个 -->\n";
 } catch (Exception $e) {
-    echo "<!-- DEBUG: 获取Netflix账号失败: " . $e->getMessage() . " -->\n";
     $active_accounts = [];
     if (empty($error)) {
         $error = '获取Netflix账号失败: ' . $e->getMessage();
     }
 }
-echo "<!-- DEBUG: 开始HTML渲染 -->\n";
 ?>
 
 <!DOCTYPE html>
@@ -440,16 +424,9 @@ echo "<!-- DEBUG: 开始HTML渲染 -->\n";
                         <button class="btn btn-warning me-2" onclick="showBatchActions()" id="batchActionsBtn" style="display: none;">
                             <i class="bi bi-gear"></i> 批量操作
                         </button>
-                        <div class="btn-group">
-                            <button class="btn btn-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-download"></i> 导出全部
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="?action=export&format=txt<?php echo $card_type_filter ? "&card_type={$card_type_filter}" : ''; ?>">TXT格式</a></li>
-                                <li><a class="dropdown-item" href="?action=export&format=csv<?php echo $card_type_filter ? "&card_type={$card_type_filter}" : ''; ?>">CSV格式</a></li>
-                                <li><a class="dropdown-item" href="?action=export&format=excel<?php echo $card_type_filter ? "&card_type={$card_type_filter}" : ''; ?>">Excel格式</a></li>
-                            </ul>
-                        </div>
+                        <a href="?action=export&format=txt<?php echo $card_type_filter ? "&card_type={$card_type_filter}" : ''; ?>" class="btn btn-info">
+                            <i class="bi bi-download"></i> 导出全部
+                        </a>
                     </div>
                 </div>
 
@@ -468,26 +445,17 @@ echo "<!-- DEBUG: 开始HTML渲染 -->\n";
                 <?php endif; ?>
 
                 <!-- 显示生成的分享码 -->
-                <?php echo "<!-- DEBUG: 检查生成的分享码 -->\n"; ?>
                 <?php if (isset($_SESSION['generated_codes'])): ?>
-                    <?php echo "<!-- DEBUG: 有生成的分享码，开始渲染 -->\n"; ?>
                     <div class="card mb-4">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">新生成的分享链接</h5>
-                            <div class="btn-group btn-group-sm">
-                                <a href="?action=export_generated&format=txt" class="btn btn-outline-success">
-                                    <i class="bi bi-download"></i> 导出TXT
-                                </a>
-                                <a href="?action=export_generated&format=csv" class="btn btn-outline-info">
-                                    <i class="bi bi-download"></i> 导出CSV
-                                </a>
-                            </div>
+                            <a href="?action=export_generated&format=txt" class="btn btn-outline-success btn-sm">
+                                <i class="bi bi-download"></i> 导出
+                            </a>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <?php echo "<!-- DEBUG: 开始循环生成的分享码 -->\n"; ?>
                                 <?php foreach ($_SESSION['generated_codes'] as $code): ?>
-                                    <?php echo "<!-- DEBUG: 处理分享码: " . htmlspecialchars($code) . " -->\n"; ?>
                                     <div class="col-md-6 mb-2">
                                         <div class="input-group">
                                             <?php 
@@ -508,9 +476,7 @@ echo "<!-- DEBUG: 开始HTML渲染 -->\n";
                         </div>
                     </div>
                     <?php unset($_SESSION['generated_codes']); ?>
-                    <?php echo "<!-- DEBUG: 生成的分享码部分渲染完成 -->\n"; ?>
                 <?php else: ?>
-                    <?php echo "<!-- DEBUG: 没有生成的分享码 -->\n"; ?>
                 <?php endif; ?>
 
                 <!-- 搜索和过滤器 -->
@@ -604,9 +570,7 @@ echo "<!-- DEBUG: 开始HTML渲染 -->\n";
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php echo "<!-- DEBUG: 开始循环分享页列表，共 " . count($share_pages) . " 条记录 -->\n"; ?>
                                     <?php foreach ($share_pages as $page): ?>
-                                        <?php echo "<!-- DEBUG: 处理分享页ID: " . $page['id'] . " -->\n"; ?>
                                         <?php
                                         $is_active = $page['is_activated'] && $page['expires_at'] && strtotime($page['expires_at']) > time();
                                         $is_expired = $page['is_activated'] && $page['expires_at'] && strtotime($page['expires_at']) <= time();
@@ -697,7 +661,6 @@ echo "<!-- DEBUG: 开始HTML渲染 -->\n";
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
-                                    <?php echo "<!-- DEBUG: 分享页列表循环完成 -->\n"; ?>
                                 </tbody>
                             </table>
                         </div>
