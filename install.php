@@ -13,12 +13,13 @@ if (file_exists('config/installed.lock') && $step != 'complete') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($step == 1) {
         // 数据库配置测试
-        $host = $_POST['db_host'] ?? 'localhost';
-        $dbname = $_POST['db_name'] ?? 'netflix_manager';
-        $username = $_POST['db_username'] ?? 'root';
-        $password = $_POST['db_password'] ?? '';
+        $host = trim($_POST['db_host'] ?? 'localhost');
+        $dbname = trim($_POST['db_name'] ?? 'netflix_manager');
+        $username = trim($_POST['db_username'] ?? 'root');
+        $password = $_POST['db_password'] ?? ''; // 密码可能为空，不要trim
         
         try {
+            // 先测试数据库连接
             $dsn = "mysql:host=$host;charset=utf8mb4";
             $pdo = new PDO($dsn, $username, $password, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
@@ -28,13 +29,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             $pdo->exec("USE `$dbname`");
             
-            // 保存数据库配置
+            // 检查config目录是否存在，不存在则创建
+            if (!is_dir('config')) {
+                if (!mkdir('config', 0755, true)) {
+                    throw new Exception('无法创建config目录，请检查文件权限');
+                }
+            }
+            
+            // 检查config目录是否可写
+            if (!is_writable('config')) {
+                throw new Exception('config目录不可写，请设置目录权限为755或777');
+            }
+            
+            // 保存数据库配置，正确转义密码中的特殊字符
+            $escaped_password = str_replace(['\\', "'"], ['\\\\', "\\'"], $password);
             $config_content = "<?php
 class Database {
     private \$host = '$host';
     private \$db_name = '$dbname';
     private \$username = '$username';
-    private \$password = '$password';
+    private \$password = '$escaped_password';
     private \$pdo = null;
     
     public function getConnection() {
@@ -59,25 +73,51 @@ class Database {
 \$db = new Database();
 \$pdo = \$db->getConnection();
 ?>";
-            file_put_contents('config/database.php', $config_content);
+            
+            $write_result = file_put_contents('config/database.php', $config_content);
+            if ($write_result === false) {
+                throw new Exception('无法写入数据库配置文件，请检查config目录权限');
+            }
             
             $step = 2;
+        } catch (PDOException $e) {
+            $error = '数据库连接失败: ' . $e->getMessage() . '（请检查数据库主机、用户名、密码是否正确）';
         } catch (Exception $e) {
-            $error = '数据库连接失败: ' . $e->getMessage();
+            $error = $e->getMessage();
         }
     } elseif ($step == 2) {
         // 创建数据表和初始数据
         try {
+            if (!file_exists('config/database.php')) {
+                throw new Exception('数据库配置文件不存在，请重新配置数据库');
+            }
+            
             require_once 'config/database.php';
+            
+            if (!file_exists('database/setup.sql')) {
+                throw new Exception('数据库结构文件(database/setup.sql)不存在');
+            }
             
             // 读取SQL文件并执行
             $sql = file_get_contents('database/setup.sql');
+            if ($sql === false) {
+                throw new Exception('无法读取数据库结构文件');
+            }
+            
+            // 分解SQL语句并执行
             $statements = explode(';', $sql);
             
             foreach ($statements as $statement) {
                 $statement = trim($statement);
-                if (!empty($statement)) {
-                    $pdo->exec($statement);
+                if (!empty($statement) && !preg_match('/^--/', $statement)) {
+                    try {
+                        $pdo->exec($statement);
+                    } catch (PDOException $e) {
+                        // 如果是表已存在的错误，继续执行
+                        if (strpos($e->getMessage(), 'already exists') === false) {
+                            throw $e;
+                        }
+                    }
                 }
             }
             
@@ -231,6 +271,32 @@ class Database {
                     <div class="mb-4">
                         <h4><i class="bi bi-database me-2"></i>数据库配置</h4>
                         <p class="text-muted">请输入数据库连接信息，系统将自动创建数据库（如果不存在）。</p>
+                        
+                        <?php 
+                        // 检查文件权限
+                        $permission_issues = [];
+                        if (!is_dir('config')) {
+                            $permission_issues[] = 'config目录不存在';
+                        } elseif (!is_writable('config')) {
+                            $permission_issues[] = 'config目录不可写';
+                        }
+                        
+                        if (!empty($permission_issues)):
+                        ?>
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <strong>权限检查：</strong>
+                                <ul class="mb-0 mt-2">
+                                    <?php foreach ($permission_issues as $issue): ?>
+                                        <li><?php echo $issue; ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                                <div class="mt-2">
+                                    <strong>解决方法：</strong><br>
+                                    <code>chmod 755 config/</code> 或 <code>chmod 777 config/</code>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </div>
                     
                     <form method="POST">

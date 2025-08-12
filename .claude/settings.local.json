@@ -13,7 +13,10 @@
       "Bash(rm:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git config:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }
