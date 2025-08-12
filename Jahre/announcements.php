@@ -13,7 +13,7 @@ if ($_POST['action'] ?? '' === 'add_announcement') {
     $title = sanitizeInput($_POST['title'] ?? '');
     $content = $_POST['content'] ?? '';
     $content_type = sanitizeInput($_POST['content_type'] ?? 'html');
-    $is_popup = isset($_POST['is_popup']);
+    $is_popup = isset($_POST['is_popup']) ? 1 : 0;
     $popup_duration = (int)($_POST['popup_duration'] ?? 5000);
     $priority = (int)($_POST['priority'] ?? 0);
     
@@ -36,7 +36,7 @@ if ($_POST['action'] ?? '' === 'add_announcement') {
 // 处理更新公告状态
 if ($_POST['action'] ?? '' === 'toggle_status') {
     $announcement_id = (int)($_POST['announcement_id'] ?? 0);
-    $is_active = isset($_POST['is_active']);
+    $is_active = isset($_POST['is_active']) ? 1 : 0;
     
     if ($announcement_id > 0) {
         $pdo = getConnection();

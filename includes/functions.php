@@ -357,7 +357,7 @@ function getActiveAnnouncements() {
 function addAnnouncement($title, $content, $content_type = 'html', $is_popup = false, $popup_duration = 5000) {
     $pdo = getConnection();
     $stmt = $pdo->prepare("INSERT INTO announcements (title, content, content_type, is_popup, popup_duration) VALUES (?, ?, ?, ?, ?)");
-    return $stmt->execute([$title, $content, $content_type, $is_popup, $popup_duration]);
+    return $stmt->execute([$title, $content, $content_type, $is_popup ? 1 : 0, $popup_duration]);
 }
 
 // 工具函数
