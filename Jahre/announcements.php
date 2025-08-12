@@ -13,7 +13,7 @@ if ($_POST['action'] ?? '' === 'add_announcement') {
     $title = sanitizeInput($_POST['title'] ?? '');
     $content = $_POST['content'] ?? '';
     $content_type = sanitizeInput($_POST['content_type'] ?? 'html');
-    $is_popup = isset($_POST['is_popup']) ? 1 : 0;
+    $is_popup = (int)($_POST['is_popup'] ?? 0);
     $popup_duration = (int)($_POST['popup_duration'] ?? 5000);
     $priority = (int)($_POST['priority'] ?? 0);
     
@@ -36,7 +36,7 @@ if ($_POST['action'] ?? '' === 'add_announcement') {
 // 处理更新公告状态
 if ($_POST['action'] ?? '' === 'toggle_status') {
     $announcement_id = (int)($_POST['announcement_id'] ?? 0);
-    $is_active = isset($_POST['is_active']) ? 1 : 0;
+    $is_active = (int)($_POST['is_active'] ?? 0);
     
     if ($announcement_id > 0) {
         $pdo = getConnection();
@@ -292,7 +292,8 @@ $announcements = $stmt->fetchAll();
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="is_popup" name="is_popup" onchange="togglePopupOptions()">
+                                    <input type="hidden" name="is_popup" value="0">
+                                    <input type="checkbox" class="form-check-input" id="is_popup" name="is_popup" value="1" onchange="togglePopupOptions()">
                                     <label class="form-check-label" for="is_popup">
                                         弹窗显示
                                     </label>
@@ -332,7 +333,7 @@ $announcements = $stmt->fetchAll();
     <form id="statusForm" method="POST" style="display: none;">
         <input type="hidden" name="action" value="toggle_status">
         <input type="hidden" name="announcement_id" id="status_announcement_id">
-        <input type="hidden" name="is_active" id="status_is_active">
+        <input type="hidden" name="is_active" id="status_is_active" value="0">
     </form>
 
     <form id="deleteForm" method="POST" style="display: none;">
@@ -434,12 +435,9 @@ $announcements = $stmt->fetchAll();
             const action = isActive === 'true' ? '启用' : '暂停';
             if (confirm(`确定要${action}此公告吗？`)) {
                 document.getElementById('status_announcement_id').value = announcementId;
-                if (isActive === 'true') {
-                    document.getElementById('status_is_active').name = 'is_active';
-                    document.getElementById('status_is_active').value = '1';
-                } else {
-                    document.getElementById('status_is_active').removeAttribute('name');
-                }
+                const statusField = document.getElementById('status_is_active');
+                statusField.name = 'is_active';
+                statusField.value = isActive === 'true' ? '1' : '0';
                 document.getElementById('statusForm').submit();
             }
         }
