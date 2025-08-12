@@ -1,8 +1,4 @@
 <?php
-// 调试：开启错误报告
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 session_start();
 require_once '../config/database.php';
 require_once '../includes/functions.php';
@@ -340,7 +336,7 @@ try {
     }
 }
 ?>
-<!-- DEBUG: PHP处理完成，开始HTML渲染 -->
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -405,7 +401,6 @@ try {
             </div>
         </div>
     </nav>
-    <!-- DEBUG: 导航栏渲染完成 -->
 
     <div class="container-fluid mt-4">
         <div class="row">
@@ -446,7 +441,6 @@ try {
                     </div>
                 <?php endif; ?>
 
-                <!-- DEBUG: 开始生成的分享码部分 -->
                 <!-- 显示生成的分享码 -->
                 <?php if (isset($_SESSION['generated_codes'])): ?>
                     <div class="card mb-4">
@@ -464,7 +458,6 @@ try {
                         <div class="card-body">
                             <div class="row">
                                 <?php foreach ($_SESSION['generated_codes'] as $code): ?>
-                                        <!-- DEBUG: 处理分享码: <?php echo htmlspecialchars($code); ?> -->
                                     <div class="col-md-6 mb-2">
                                         <div class="input-group">
                                             <?php 
@@ -578,7 +571,6 @@ try {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <!-- DEBUG: 开始渲染分享页列表，共 <?php echo count($share_pages); ?> 个 -->
                                     <?php foreach ($share_pages as $page): ?>
                                         <?php
                                         $is_active = $page['is_activated'] && $page['expires_at'] && strtotime($page['expires_at']) > time();
@@ -823,11 +815,8 @@ try {
         <input type="hidden" name="share_id" id="delete_share_id">
     </form>
 
-    <!-- DEBUG: HTML渲染完成，开始加载JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // 调试：检查页面是否完整加载
-        console.log('share-pages.php JavaScript开始加载...');
         function copyToClipboard(text) {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(text).then(function() {
@@ -931,12 +920,6 @@ try {
                 document.getElementById('batchDeleteForm').submit();
             }
         }
-        
-        // 调试：检查所有函数是否已定义
-        console.log('所有JavaScript函数已加载完成');
-        console.log('copyToClipboard函数:', typeof copyToClipboard);
-        console.log('deleteSharePage函数:', typeof deleteSharePage);
-        console.log('toggleSelectAll函数:', typeof toggleSelectAll);
     </script>
 </body>
 </html>
