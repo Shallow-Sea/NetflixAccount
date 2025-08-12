@@ -1,4 +1,8 @@
 <?php
+// 调试：开启错误报告
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 require_once '../config/database.php';
 require_once '../includes/functions.php';
@@ -187,6 +191,12 @@ if ($_GET['action'] ?? '' === 'export_generated') {
     if (empty($codes)) {
         // 重定向回页面并显示错误
         header('Location: share-pages.php?error=' . urlencode('没有可导出的分享页'));
+        exit;
+    }
+    
+    // 检查必要的函数是否存在
+    if (!function_exists('exportGeneratedToCSV') || !function_exists('exportGeneratedToTXT')) {
+        header('Location: share-pages.php?error=' . urlencode('导出功能不可用，缺少必要函数'));
         exit;
     }
     
@@ -799,6 +809,8 @@ try {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // 调试：检查页面是否完整加载
+        console.log('share-pages.php JavaScript开始加载...');
         function copyToClipboard(text) {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(text).then(function() {
@@ -902,6 +914,12 @@ try {
                 document.getElementById('batchDeleteForm').submit();
             }
         }
+        
+        // 调试：检查所有函数是否已定义
+        console.log('所有JavaScript函数已加载完成');
+        console.log('copyToClipboard函数:', typeof copyToClipboard);
+        console.log('deleteSharePage函数:', typeof deleteSharePage);
+        console.log('toggleSelectAll函数:', typeof toggleSelectAll);
     </script>
 </body>
 </html>

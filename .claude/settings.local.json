@@ -10,7 +10,10 @@
       "Bash(git branch:*)",
       "Bash(git push:*)",
       "Bash(systemctl:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }
