@@ -9,14 +9,7 @@ checkAdminAccess();
 // 获取管理员信息
 $admin_info = getAdminById($_SESSION['admin_id']);
 
-// 获取弹窗公告
-$popup_announcements = [];
-$all_announcements = getActiveAnnouncements();
-foreach ($all_announcements as $announcement) {
-    if ($announcement['is_popup']) {
-        $popup_announcements[] = $announcement;
-    }
-}
+// 后台不显示弹窗公告
 ?>
 
 <!DOCTYPE html>
@@ -44,6 +37,11 @@ foreach ($all_announcements as $announcement) {
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
+                        <a class="nav-link active" href="admin-dashboard.php">
+                            <i class="bi bi-speedometer2"></i> 管理仪表板
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="accounts.php">
                             <i class="bi bi-person-lines-fill"></i> 账号管理
                         </a>
@@ -66,6 +64,11 @@ foreach ($all_announcements as $announcement) {
                 </ul>
                 
                 <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="../index.php">
+                            <i class="bi bi-house"></i> 前台首页
+                        </a>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-person-circle"></i> 
@@ -287,46 +290,9 @@ foreach ($all_announcements as $announcement) {
         </div>
     </div>
 
-    <!-- 弹窗公告 -->
-    <?php foreach ($popup_announcements as $announcement): ?>
-        <div class="modal fade" id="announcement-<?php echo $announcement['id']; ?>" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><?php echo htmlspecialchars($announcement['title']); ?></h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <?php
-                        if ($announcement['content_type'] == 'markdown') {
-                            echo parseMarkdown($announcement['content']);
-                        } else {
-                            echo $announcement['content'];
-                        }
-                        ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-    <?php endforeach; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/main.js"></script>
     
-    <!-- 显示弹窗公告 -->
-    <script>
-    <?php foreach ($popup_announcements as $announcement): ?>
-        setTimeout(function() {
-            var modal = new bootstrap.Modal(document.getElementById('announcement-<?php echo $announcement['id']; ?>'));
-            modal.show();
-        }, 1000);
-        
-        // 自动关闭弹窗
-        setTimeout(function() {
-            var modal = bootstrap.Modal.getInstance(document.getElementById('announcement-<?php echo $announcement['id']; ?>'));
-            if (modal) modal.hide();
-        }, <?php echo $announcement['popup_duration'] + 1000; ?>);
-    <?php endforeach; ?>
-    </script>
 </body>
 </html>

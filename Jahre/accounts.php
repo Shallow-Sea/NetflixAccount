@@ -82,13 +82,51 @@ $accounts = getNetflixAccounts();
                 <i class="bi bi-tv"></i> 奈飞分享系统
             </a>
             
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="../index.php">
-                    <i class="bi bi-house"></i> 返回首页
-                </a>
-                <a class="nav-link" href="../logout.php">
-                    <i class="bi bi-box-arrow-right"></i> 退出登录
-                </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="admin-dashboard.php">
+                            <i class="bi bi-speedometer2"></i> 管理仪表板
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="accounts.php">
+                            <i class="bi bi-person-lines-fill"></i> 账号管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="users.php">
+                            <i class="bi bi-people"></i> 用户管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="share-pages.php">
+                            <i class="bi bi-share"></i> 分享页管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="announcements.php">
+                            <i class="bi bi-megaphone"></i> 公告管理
+                        </a>
+                    </li>
+                </ul>
+                
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="../index.php">
+                            <i class="bi bi-house"></i> 前台首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="../logout.php">
+                            <i class="bi bi-box-arrow-right"></i> 退出登录
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
