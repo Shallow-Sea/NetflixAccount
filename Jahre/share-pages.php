@@ -261,6 +261,7 @@ if ($_GET['action'] ?? '' === 'export') {
 }
 
 // 获取分享页列表
+echo "<!-- DEBUG: 开始获取分享页列表 -->\n";
 $pdo = getConnection();
 
 // 分页参数
@@ -300,6 +301,7 @@ if ($search) {
 }
 
 $where_clause = $where_conditions ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+echo "<!-- DEBUG: WHERE条件: $where_clause, 参数数量: " . count($params) . " -->\n";
 
 // 获取总数
 $count_sql = "
@@ -309,11 +311,14 @@ $count_sql = "
     LEFT JOIN users u ON sp.user_id = u.id
     {$where_clause}
 ";
+echo "<!-- DEBUG: 准备执行COUNT查询 -->\n";
 try {
     $count_stmt = $pdo->prepare($count_sql);
     $count_stmt->execute($params);
     $total_count = $count_stmt->fetchColumn();
+    echo "<!-- DEBUG: COUNT查询成功，总数: $total_count -->\n";
 } catch (Exception $e) {
+    echo "<!-- DEBUG: COUNT查询失败: " . $e->getMessage() . " -->\n";
     $error = '获取分享页总数失败: ' . $e->getMessage();
     $total_count = 0;
 }
@@ -329,11 +334,14 @@ $sql = "
     ORDER BY sp.created_at DESC
     LIMIT {$per_page} OFFSET {$offset}
 ";
+echo "<!-- DEBUG: 准备执行主查询 -->\n";
 try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $share_pages = $stmt->fetchAll();
+    echo "<!-- DEBUG: 主查询成功，返回 " . count($share_pages) . " 条记录 -->\n";
 } catch (Exception $e) {
+    echo "<!-- DEBUG: 主查询失败: " . $e->getMessage() . " -->\n";
     $error = '获取分享页列表失败: ' . $e->getMessage();
     $share_pages = [];
 }
@@ -341,9 +349,12 @@ try {
 $total_pages = ceil($total_count / $per_page);
 
 // 获取Netflix账号列表用于创建分享页
+echo "<!-- DEBUG: 准备获取Netflix账号 -->\n";
 try {
     $active_accounts = getNetflixAccounts('active');
+    echo "<!-- DEBUG: 获取Netflix账号成功，共 " . count($active_accounts) . " 个 -->\n";
 } catch (Exception $e) {
+    echo "<!-- DEBUG: 获取Netflix账号失败: " . $e->getMessage() . " -->\n";
     $active_accounts = [];
     if (empty($error)) {
         $error = '获取Netflix账号失败: ' . $e->getMessage();
