@@ -340,7 +340,7 @@ try {
     }
 }
 ?>
-
+<!-- DEBUG: PHP处理完成，开始HTML渲染 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -405,6 +405,7 @@ try {
             </div>
         </div>
     </nav>
+    <!-- DEBUG: 导航栏渲染完成 -->
 
     <div class="container-fluid mt-4">
         <div class="row">
@@ -445,6 +446,7 @@ try {
                     </div>
                 <?php endif; ?>
 
+                <!-- DEBUG: 开始生成的分享码部分 -->
                 <!-- 显示生成的分享码 -->
                 <?php if (isset($_SESSION['generated_codes'])): ?>
                     <div class="card mb-4">
@@ -462,9 +464,16 @@ try {
                         <div class="card-body">
                             <div class="row">
                                 <?php foreach ($_SESSION['generated_codes'] as $code): ?>
+                                        <!-- DEBUG: 处理分享码: <?php echo htmlspecialchars($code); ?> -->
                                     <div class="col-md-6 mb-2">
                                         <div class="input-group">
-                                            <?php $generated_url = generateShareUrl($code); ?>
+                                            <?php 
+                                            try {
+                                                $generated_url = generateShareUrl($code); 
+                                            } catch (Exception $e) {
+                                                $generated_url = "Error: " . $e->getMessage();
+                                            }
+                                            ?>
                                             <input type="text" class="form-control" value="<?php echo htmlspecialchars($generated_url); ?>" readonly>
                                             <button class="btn btn-outline-primary" onclick="copyToClipboard('<?php echo htmlspecialchars($generated_url, ENT_QUOTES); ?>')">
                                                 <i class="bi bi-clipboard"></i>
@@ -569,6 +578,7 @@ try {
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <!-- DEBUG: 开始渲染分享页列表，共 <?php echo count($share_pages); ?> 个 -->
                                     <?php foreach ($share_pages as $page): ?>
                                         <?php
                                         $is_active = $page['is_activated'] && $page['expires_at'] && strtotime($page['expires_at']) > time();
@@ -582,7 +592,13 @@ try {
                                             <code><?php echo htmlspecialchars($page['share_code']); ?></code>
                                         </td>
                                         <td>
-                                            <?php $share_url = generateShareUrl($page['share_code']); ?>
+                                            <?php 
+                                            try {
+                                                $share_url = generateShareUrl($page['share_code']); 
+                                            } catch (Exception $e) {
+                                                $share_url = "Error: " . $e->getMessage();
+                                            }
+                                            ?>
                                             <div class="input-group input-group-sm">
                                                 <input type="text" class="form-control" value="<?php echo htmlspecialchars($share_url); ?>" readonly>
                                                 <button class="btn btn-outline-primary btn-sm" onclick="copyToClipboard('<?php echo htmlspecialchars($share_url, ENT_QUOTES); ?>')">
@@ -807,6 +823,7 @@ try {
         <input type="hidden" name="share_id" id="delete_share_id">
     </form>
 
+    <!-- DEBUG: HTML渲染完成，开始加载JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // 调试：检查页面是否完整加载
