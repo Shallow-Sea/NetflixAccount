@@ -1,21 +1,22 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
-// 用户认证函数
-function login($username, $password, $is_admin = false) {
-    $pdo = getConnection();
+// =================
+// 认证相关函数
+// =================
+
+function login($username, $password) {
+    global $pdo;
     
-    $table = $is_admin ? 'admins' : 'users';
-    $stmt = $pdo->prepare("SELECT id, username, password FROM {$table} WHERE username = ?");
+    $stmt = $pdo->prepare("SELECT * FROM admins WHERE username = ? AND is_active = 1");
     $stmt->execute([$username]);
-    $user = $stmt->fetch();
+    $admin = $stmt->fetch();
     
-    if ($user && password_verify($password, $user['password'])) {
-        if ($is_admin) {
-            $_SESSION['admin_id'] = $user['id'];
-        } else {
-            $_SESSION['user_id'] = $user['id'];
-        }
+    if ($admin && password_verify($password, $admin['password'])) {
+        $_SESSION['admin_id'] = $admin['id'];
+        $_SESSION['admin_username'] = $admin['username'];
+        
+        logOperation($admin['id'], 'login', 'admin', $admin['id'], '管理员登录');
         return true;
     }
     
@@ -23,486 +24,793 @@ function login($username, $password, $is_admin = false) {
 }
 
 function logout() {
+    if (isset($_SESSION['admin_id'])) {
+        logOperation($_SESSION['admin_id'], 'logout', 'admin', $_SESSION['admin_id'], '管理员退出');
+    }
+    
     session_destroy();
-    header('Location: login.php');
-    exit;
+    return true;
 }
 
-// 用户管理函数
-function getUserById($id) {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-    $stmt->execute([$id]);
-    return $stmt->fetch();
+function isLoggedIn() {
+    return isset($_SESSION['admin_id']) && !empty($_SESSION['admin_id']);
 }
 
-function getAdminById($id) {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("SELECT * FROM admins WHERE id = ?");
-    $stmt->execute([$id]);
-    return $stmt->fetch();
-}
-
-function registerUser($username, $password, $email = null, $phone = null) {
-    $pdo = getConnection();
-    
-    // 检查用户名是否已存在
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
-    $stmt->execute([$username]);
-    if ($stmt->fetch()) {
-        return false; // 用户名已存在
+function requireLogin() {
+    if (!isLoggedIn()) {
+        header('Location: login.php');
+        exit;
     }
-    
-    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-    $registration_ip = $_SERVER['REMOTE_ADDR'];
-    
-    $stmt = $pdo->prepare("INSERT INTO users (username, password, email, phone, registration_ip) VALUES (?, ?, ?, ?, ?)");
-    return $stmt->execute([$username, $hashed_password, $email, $phone, $registration_ip]);
 }
 
-// Netflix账号管理函数
-function addNetflixAccount($email, $password, $subscription_type = 'premium') {
-    $pdo = getConnection();
-    
-    // 检查账号是否已存在
-    $stmt = $pdo->prepare("SELECT id FROM netflix_accounts WHERE email = ?");
-    $stmt->execute([$email]);
-    if ($stmt->fetch()) {
-        return false; // 账号已存在
-    }
-    
-    $stmt = $pdo->prepare("INSERT INTO netflix_accounts (email, password, subscription_type) VALUES (?, ?, ?)");
-    return $stmt->execute([$email, $password, $subscription_type]);
-}
+// =================
+// 奈飞账号管理函数
+// =================
 
-function getNetflixAccounts($status = null) {
-    $pdo = getConnection();
+function addNetflixAccount($data) {
+    global $pdo;
     
-    if ($status) {
-        $stmt = $pdo->prepare("SELECT * FROM netflix_accounts WHERE status = ? ORDER BY created_at DESC");
-        $stmt->execute([$status]);
-    } else {
-        $stmt = $pdo->prepare("SELECT * FROM netflix_accounts ORDER BY created_at DESC");
-        $stmt->execute();
-    }
-    
-    return $stmt->fetchAll();
-}
-
-function updateNetflixAccountStatus($id, $status) {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("UPDATE netflix_accounts SET status = ? WHERE id = ?");
-    return $stmt->execute([$status, $id]);
-}
-
-// 分享页管理函数
-function createSharePage($netflix_account_id, $card_type, $user_id = null) {
-    $pdo = getConnection();
-    
-    // 如果账号ID为0，则随机选择一个活跃账号
-    if ($netflix_account_id === 0) {
-        $netflix_account_id = getRandomActiveAccount();
-        if (!$netflix_account_id) {
-            return false; // 没有可用的活跃账号
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO netflix_accounts 
+            (email, password, subscription_type, status, 
+             slot1_enabled, slot1_pin, slot2_enabled, slot2_pin, 
+             slot3_enabled, slot3_pin, slot4_enabled, slot4_pin, 
+             slot5_enabled, slot5_pin) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $result = $stmt->execute([
+            $data['email'],
+            $data['password'],
+            $data['subscription_type'] ?? 'premium',
+            $data['status'] ?? 'active',
+            $data['slot1_enabled'] ?? true,
+            $data['slot1_pin'] ?? null,
+            $data['slot2_enabled'] ?? true,
+            $data['slot2_pin'] ?? null,
+            $data['slot3_enabled'] ?? true,
+            $data['slot3_pin'] ?? null,
+            $data['slot4_enabled'] ?? true,
+            $data['slot4_pin'] ?? null,
+            $data['slot5_enabled'] ?? true,
+            $data['slot5_pin'] ?? null
+        ]);
+        
+        if ($result) {
+            $accountId = $pdo->lastInsertId();
+            logOperation($_SESSION['admin_id'], 'create', 'account', $accountId, '添加奈飞账号: ' . $data['email']);
+            return $accountId;
         }
-    }
-    
-    // 生成唯一的分享码
-    do {
-        $share_code = bin2hex(random_bytes(16));
-        $stmt = $pdo->prepare("SELECT id FROM share_pages WHERE share_code = ?");
-        $stmt->execute([$share_code]);
-    } while ($stmt->fetch());
-    
-    // 计算持续天数
-    $duration_days = getCardTypeDays($card_type);
-    
-    $stmt = $pdo->prepare("INSERT INTO share_pages (share_code, netflix_account_id, user_id, card_type, duration_days) VALUES (?, ?, ?, ?, ?)");
-    
-    if ($stmt->execute([$share_code, $netflix_account_id, $user_id, $card_type, $duration_days])) {
-        return $share_code;
-    }
-    
-    return false;
-}
-
-// 获取随机活跃账号ID (智能分发，避免同一账号被重复使用)
-function getRandomActiveAccount() {
-    $pdo = getConnection();
-    
-    // 获取所有活跃账号及其使用次数统计
-    $stmt = $pdo->prepare("
-        SELECT na.id, na.email, COUNT(sp.id) as usage_count 
-        FROM netflix_accounts na 
-        LEFT JOIN share_pages sp ON na.id = sp.netflix_account_id 
-        WHERE na.status = 'active' 
-        GROUP BY na.id, na.email 
-        ORDER BY usage_count ASC, RAND()
-    ");
-    $stmt->execute();
-    $accounts = $stmt->fetchAll();
-    
-    if (empty($accounts)) {
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("添加奈飞账号失败: " . $e->getMessage());
         return false;
     }
-    
-    // 如果有多个账号使用次数相同且最少，随机选择一个
-    $min_usage = $accounts[0]['usage_count'];
-    $candidates = [];
+}
+
+function batchAddNetflixAccounts($accounts) {
+    $success_count = 0;
+    $failed_accounts = [];
     
     foreach ($accounts as $account) {
-        if ($account['usage_count'] == $min_usage) {
-            $candidates[] = $account['id'];
+        $result = addNetflixAccount($account);
+        if ($result) {
+            $success_count++;
         } else {
-            break; // 因为已经按使用次数排序，后面的使用次数会更多
+            $failed_accounts[] = $account['email'];
         }
     }
     
-    // 从使用次数最少的候选账号中随机选择
-    return $candidates[array_rand($candidates)];
+    return ['success_count' => $success_count, 'failed_accounts' => $failed_accounts];
 }
 
-function activateSharePage($share_code) {
-    $pdo = getConnection();
+function updateNetflixAccount($id, $data) {
+    global $pdo;
     
-    // 获取分享页信息
-    $stmt = $pdo->prepare("SELECT * FROM share_pages WHERE share_code = ? AND is_activated = FALSE");
-    $stmt->execute([$share_code]);
-    $share_page = $stmt->fetch();
-    
-    if (!$share_page) {
-        return false; // 分享页不存在或已激活
-    }
-    
-    // 计算到期时间
-    $expires_at = date('Y-m-d H:i:s', strtotime("+{$share_page['duration_days']} days"));
-    
-    // 更新分享页状态（不再关联用户）
-    $stmt = $pdo->prepare("UPDATE share_pages SET is_activated = TRUE, activated_at = NOW(), expires_at = ? WHERE id = ?");
-    $result = $stmt->execute([$expires_at, $share_page['id']]);
-    
-    if ($result) {
-        // 记录激活日志（不再记录用户ID）
-        $activation_ip = $_SERVER['REMOTE_ADDR'];
-        $user_agent = $_SERVER['HTTP_USER_AGENT'];
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE netflix_accounts 
+            SET email = ?, password = ?, subscription_type = ?, status = ?,
+                slot1_enabled = ?, slot1_pin = ?, slot2_enabled = ?, slot2_pin = ?,
+                slot3_enabled = ?, slot3_pin = ?, slot4_enabled = ?, slot4_pin = ?,
+                slot5_enabled = ?, slot5_pin = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
         
-        $stmt = $pdo->prepare("INSERT INTO activation_logs (share_page_id, activation_ip, user_agent) VALUES (?, ?, ?)");
-        $stmt->execute([$share_page['id'], $activation_ip, $user_agent]);
+        $result = $stmt->execute([
+            $data['email'],
+            $data['password'],
+            $data['subscription_type'],
+            $data['status'],
+            $data['slot1_enabled'],
+            $data['slot1_pin'],
+            $data['slot2_enabled'],
+            $data['slot2_pin'],
+            $data['slot3_enabled'],
+            $data['slot3_pin'],
+            $data['slot4_enabled'],
+            $data['slot4_pin'],
+            $data['slot5_enabled'],
+            $data['slot5_pin'],
+            $id
+        ]);
         
-        return true;
+        if ($result) {
+            logOperation($_SESSION['admin_id'], 'update', 'account', $id, '更新奈飞账号: ' . $data['email']);
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("更新奈飞账号失败: " . $e->getMessage());
+        return false;
     }
+}
+
+function deleteNetflixAccount($id) {
+    global $pdo;
     
-    return false;
+    try {
+        // 先获取账号信息用于日志
+        $stmt = $pdo->prepare("SELECT email FROM netflix_accounts WHERE id = ?");
+        $stmt->execute([$id]);
+        $account = $stmt->fetch();
+        
+        if (!$account) return false;
+        
+        $stmt = $pdo->prepare("DELETE FROM netflix_accounts WHERE id = ?");
+        $result = $stmt->execute([$id]);
+        
+        if ($result) {
+            logOperation($_SESSION['admin_id'], 'delete', 'account', $id, '删除奈飞账号: ' . $account['email']);
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("删除奈飞账号失败: " . $e->getMessage());
+        return false;
+    }
 }
 
-function getSharePageByCode($share_code) {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("
-        SELECT sp.*, na.email as netflix_email, na.password as netflix_password, na.subscription_type,
-               u.username
-        FROM share_pages sp
-        LEFT JOIN netflix_accounts na ON sp.netflix_account_id = na.id
-        LEFT JOIN users u ON sp.user_id = u.id
-        WHERE sp.share_code = ?
-    ");
-    $stmt->execute([$share_code]);
-    return $stmt->fetch();
-}
-
-function getUserSharePages($user_id) {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("
-        SELECT sp.*, na.email as netflix_email, na.subscription_type
-        FROM share_pages sp
-        LEFT JOIN netflix_accounts na ON sp.netflix_account_id = na.id
-        WHERE sp.user_id = ?
-        ORDER BY sp.created_at DESC
-    ");
-    $stmt->execute([$user_id]);
-    return $stmt->fetchAll();
-}
-
-// 批量导出功能
-function exportSharePages($format = 'txt', $user_id = null, $card_type = null) {
-    $pdo = getConnection();
+function batchUpdateNetflixAccountStatus($ids, $status) {
+    global $pdo;
     
+    try {
+        $placeholders = str_repeat('?,', count($ids) - 1) . '?';
+        $stmt = $pdo->prepare("UPDATE netflix_accounts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders)");
+        
+        $params = array_merge([$status], $ids);
+        $result = $stmt->execute($params);
+        
+        if ($result) {
+            foreach ($ids as $id) {
+                logOperation($_SESSION['admin_id'], 'batch_update', 'account', $id, '批量修改状态: ' . $status);
+            }
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("批量更新账号状态失败: " . $e->getMessage());
+        return false;
+    }
+}
+
+function getNetflixAccounts($page = 1, $limit = 20, $filters = []) {
+    global $pdo;
+    
+    $offset = ($page - 1) * $limit;
     $where_conditions = [];
     $params = [];
     
-    if ($user_id) {
-        $where_conditions[] = "sp.user_id = ?";
-        $params[] = $user_id;
+    if (!empty($filters['status'])) {
+        $where_conditions[] = "status = ?";
+        $params[] = $filters['status'];
     }
     
-    if ($card_type) {
-        $where_conditions[] = "sp.card_type = ?";
-        $params[] = $card_type;
+    if (!empty($filters['subscription_type'])) {
+        $where_conditions[] = "subscription_type = ?";
+        $params[] = $filters['subscription_type'];
+    }
+    
+    if (!empty($filters['email'])) {
+        $where_conditions[] = "email LIKE ?";
+        $params[] = '%' . $filters['email'] . '%';
     }
     
     $where_clause = empty($where_conditions) ? '' : 'WHERE ' . implode(' AND ', $where_conditions);
     
+    // 获取总数
+    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM netflix_accounts $where_clause");
+    $count_stmt->execute($params);
+    $total = $count_stmt->fetchColumn();
+    
+    // 获取数据
     $stmt = $pdo->prepare("
-        SELECT sp.share_code, sp.card_type, sp.is_activated, sp.created_at, sp.expires_at,
-               na.email as netflix_email, u.username
-        FROM share_pages sp
-        LEFT JOIN netflix_accounts na ON sp.netflix_account_id = na.id
-        LEFT JOIN users u ON sp.user_id = u.id
-        {$where_clause}
-        ORDER BY sp.created_at DESC
+        SELECT *, 
+               (SELECT COUNT(*) FROM share_pages WHERE netflix_account_id = netflix_accounts.id AND is_activated = 1) as active_shares
+        FROM netflix_accounts 
+        $where_clause 
+        ORDER BY created_at DESC 
+        LIMIT ? OFFSET ?
     ");
+    
+    $params[] = $limit;
+    $params[] = $offset;
     $stmt->execute($params);
+    
+    return [
+        'data' => $stmt->fetchAll(),
+        'total' => $total,
+        'page' => $page,
+        'limit' => $limit,
+        'pages' => ceil($total / $limit)
+    ];
+}
+
+function getAvailableNetflixAccount() {
+    global $pdo;
+    
+    // 获取负载最低的可用账号
+    $stmt = $pdo->prepare("
+        SELECT * FROM netflix_accounts 
+        WHERE status = 'active' 
+        ORDER BY usage_count ASC, last_used_at ASC 
+        LIMIT 1
+    ");
+    $stmt->execute();
+    
+    return $stmt->fetch();
+}
+
+// =================
+// 分享页管理函数
+// =================
+
+function generateShareCode() {
+    return bin2hex(random_bytes(16));
+}
+
+function addSharePage($data) {
+    global $pdo;
+    
+    try {
+        $share_code = generateShareCode();
+        
+        // 如果没有指定账号，自动选择负载最低的账号
+        if (empty($data['netflix_account_id'])) {
+            $account = getAvailableNetflixAccount();
+            if (!$account) {
+                return false; // 没有可用账号
+            }
+            $data['netflix_account_id'] = $account['id'];
+        }
+        
+        // 根据卡类型计算天数
+        $card_types = [
+            'day' => 1,
+            'week' => 7,
+            'month' => 30,
+            'quarter' => 90,
+            'half_year' => 180,
+            'year' => 365
+        ];
+        
+        $duration_days = $card_types[$data['card_type']] ?? 30;
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO share_pages 
+            (share_code, netflix_account_id, card_type, duration_days, title, description)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        
+        $result = $stmt->execute([
+            $share_code,
+            $data['netflix_account_id'],
+            $data['card_type'],
+            $duration_days,
+            $data['title'] ?? '奈飞高级账号分享',
+            $data['description'] ?? null
+        ]);
+        
+        if ($result) {
+            $sharePageId = $pdo->lastInsertId();
+            logOperation($_SESSION['admin_id'], 'create', 'share_page', $sharePageId, '创建分享页: ' . $share_code);
+            return $sharePageId;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("添加分享页失败: " . $e->getMessage());
+        return false;
+    }
+}
+
+function batchAddSharePages($count, $card_type, $title = null) {
+    $success_count = 0;
+    $share_codes = [];
+    
+    for ($i = 0; $i < $count; $i++) {
+        $data = [
+            'card_type' => $card_type,
+            'title' => $title
+        ];
+        
+        $result = addSharePage($data);
+        if ($result) {
+            $success_count++;
+            // 获取生成的分享码
+            global $pdo;
+            $stmt = $pdo->prepare("SELECT share_code FROM share_pages WHERE id = ?");
+            $stmt->execute([$result]);
+            $page = $stmt->fetch();
+            if ($page) {
+                $share_codes[] = $page['share_code'];
+            }
+        }
+    }
+    
+    return ['success_count' => $success_count, 'share_codes' => $share_codes];
+}
+
+function activateSharePage($share_code) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE share_pages 
+            SET is_activated = 1, 
+                activated_at = CURRENT_TIMESTAMP,
+                expires_at = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL duration_days DAY)
+            WHERE share_code = ? AND is_activated = 0
+        ");
+        
+        $result = $stmt->execute([$share_code]);
+        
+        if ($result && $stmt->rowCount() > 0) {
+            // 更新对应账号的使用统计
+            $pdo->prepare("
+                UPDATE netflix_accounts 
+                SET usage_count = usage_count + 1, last_used_at = CURRENT_TIMESTAMP 
+                WHERE id = (SELECT netflix_account_id FROM share_pages WHERE share_code = ?)
+            ")->execute([$share_code]);
+            
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("激活分享页失败: " . $e->getMessage());
+        return false;
+    }
+}
+
+function getSharePageByCode($share_code) {
+    global $pdo;
+    
+    $stmt = $pdo->prepare("
+        SELECT sp.*, na.email as netflix_email, na.password as netflix_password, 
+               na.subscription_type, na.status as account_status
+        FROM share_pages sp
+        JOIN netflix_accounts na ON sp.netflix_account_id = na.id
+        WHERE sp.share_code = ?
+    ");
+    
+    $stmt->execute([$share_code]);
+    return $stmt->fetch();
+}
+
+function getSharePages($page = 1, $limit = 20, $filters = []) {
+    global $pdo;
+    
+    $offset = ($page - 1) * $limit;
+    $where_conditions = [];
+    $params = [];
+    
+    if (!empty($filters['is_activated'])) {
+        $where_conditions[] = "sp.is_activated = ?";
+        $params[] = $filters['is_activated'] === 'true' ? 1 : 0;
+    }
+    
+    if (!empty($filters['card_type'])) {
+        $where_conditions[] = "sp.card_type = ?";
+        $params[] = $filters['card_type'];
+    }
+    
+    if (!empty($filters['share_code'])) {
+        $where_conditions[] = "sp.share_code LIKE ?";
+        $params[] = '%' . $filters['share_code'] . '%';
+    }
+    
+    $where_clause = empty($where_conditions) ? '' : 'WHERE ' . implode(' AND ', $where_conditions);
+    
+    // 获取总数
+    $count_stmt = $pdo->prepare("
+        SELECT COUNT(*) 
+        FROM share_pages sp
+        JOIN netflix_accounts na ON sp.netflix_account_id = na.id
+        $where_clause
+    ");
+    $count_stmt->execute($params);
+    $total = $count_stmt->fetchColumn();
+    
+    // 获取数据
+    $stmt = $pdo->prepare("
+        SELECT sp.*, na.email as netflix_email, na.status as account_status
+        FROM share_pages sp
+        JOIN netflix_accounts na ON sp.netflix_account_id = na.id
+        $where_clause 
+        ORDER BY sp.created_at DESC 
+        LIMIT ? OFFSET ?
+    ");
+    
+    $params[] = $limit;
+    $params[] = $offset;
+    $stmt->execute($params);
+    
+    return [
+        'data' => $stmt->fetchAll(),
+        'total' => $total,
+        'page' => $page,
+        'limit' => $limit,
+        'pages' => ceil($total / $limit)
+    ];
+}
+
+function exportSharePages($ids, $format = 'txt') {
+    global $pdo;
+    
+    $placeholders = str_repeat('?,', count($ids) - 1) . '?';
+    $stmt = $pdo->prepare("SELECT share_code FROM share_pages WHERE id IN ($placeholders)");
+    $stmt->execute($ids);
     $share_pages = $stmt->fetchAll();
     
-    // 使用generateShareUrl函数来确保正确的URL生成
-    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    $current_dir = dirname($_SERVER['REQUEST_URI']);
+    $base_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/share.php?code=';
     
-    if (strpos($current_dir, '/Jahre') !== false) {
-        $base_path = str_replace('/Jahre', '', $current_dir);
-        if ($base_path === '') {
-            $base_path = '';
+    if ($format === 'txt') {
+        $content = "奈飞分享页导出 - " . date('Y-m-d H:i:s') . "\n\n";
+        foreach ($share_pages as $page) {
+            $content .= $base_url . $page['share_code'] . "\n";
         }
-    } else {
-        $base_path = $current_dir;
-    }
-    
-    $base_path = rtrim($base_path, '/');
-    $base_url = "{$protocol}://{$host}{$base_path}/share.php?code=";
-    
-    switch ($format) {
-        case 'csv':
-            return exportToCSV($share_pages, $base_url);
-        case 'excel':
-            return exportToExcel($share_pages, $base_url);
-        case 'txt':
-        default:
-            return exportToTXT($share_pages, $base_url);
-    }
-}
-
-function exportToTXT($data, $base_url) {
-    $content = "奈飞账号分享链接导出\n";
-    $content .= "导出时间：" . date('Y-m-d H:i:s') . "\n";
-    $content .= str_repeat("=", 50) . "\n\n";
-    
-    foreach ($data as $row) {
-        $content .= "分享码：{$row['share_code']}\n";
-        $content .= "分享链接：{$base_url}{$row['share_code']}\n";
-        $content .= "卡类型：" . getCardTypeName($row['card_type']) . "\n";
-        $content .= "创建时间：{$row['created_at']}\n";
-        $content .= "激活状态：" . ($row['is_activated'] ? '已激活' : '未激活') . "\n";
-        if ($row['is_activated'] && $row['expires_at']) {
-            $content .= "到期时间：{$row['expires_at']}\n";
+        return $content;
+    } elseif ($format === 'excel') {
+        // 这里可以集成 PhpSpreadsheet 库来生成 Excel 文件
+        // 简化版本，返回 CSV 格式
+        $content = "分享码,链接\n";
+        foreach ($share_pages as $page) {
+            $content .= $page['share_code'] . ',' . $base_url . $page['share_code'] . "\n";
         }
-        $content .= str_repeat("-", 30) . "\n\n";
+        return $content;
     }
     
-    return $content;
+    return false;
 }
 
-function exportToCSV($data, $base_url) {
-    $csv = "分享码,分享链接,卡类型,创建时间,激活状态,到期时间,用户名\n";
-    
-    foreach ($data as $row) {
-        $csv .= '"' . $row['share_code'] . '",';
-        $csv .= '"' . $base_url . $row['share_code'] . '",';
-        $csv .= '"' . getCardTypeName($row['card_type']) . '",';
-        $csv .= '"' . $row['created_at'] . '",';
-        $csv .= '"' . ($row['is_activated'] ? '已激活' : '未激活') . '",';
-        $csv .= '"' . ($row['expires_at'] ?? '') . '",';
-        $csv .= '"' . ($row['username'] ?? '') . '"' . "\n";
-    }
-    
-    return $csv;
-}
-
-// 统计函数
-function getActiveAccountsCount() {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM netflix_accounts WHERE status = 'active'");
-    $stmt->execute();
-    return $stmt->fetchColumn();
-}
-
-function getTotalUsersCount() {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE status = 'active'");
-    $stmt->execute();
-    return $stmt->fetchColumn();
-}
-
-function getActiveSharePagesCount() {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM share_pages WHERE is_activated = TRUE AND expires_at > NOW()");
-    $stmt->execute();
-    return $stmt->fetchColumn();
-}
-
-function getTodayActivationsCount() {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM activation_logs WHERE DATE(activated_at) = CURDATE()");
-    $stmt->execute();
-    return $stmt->fetchColumn();
-}
-
-function getRecentActivations($limit = 10) {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("
-        SELECT sp.share_code, sp.card_type, sp.activated_at, sp.expires_at,
-               al.activation_ip, u.username
-        FROM activation_logs al
-        LEFT JOIN share_pages sp ON al.share_page_id = sp.id
-        LEFT JOIN users u ON al.user_id = u.id
-        ORDER BY al.activated_at DESC
-        LIMIT ?
-    ");
-    $stmt->execute([$limit]);
-    return $stmt->fetchAll();
-}
-
+// =================
 // 公告管理函数
+// =================
+
+function addAnnouncement($data) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO announcements 
+            (title, content, content_type, is_popup, popup_duration, is_active, start_date, end_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $result = $stmt->execute([
+            $data['title'],
+            $data['content'],
+            $data['content_type'] ?? 'html',
+            $data['is_popup'] ?? false,
+            $data['popup_duration'] ?? 5000,
+            $data['is_active'] ?? true,
+            $data['start_date'] ?? null,
+            $data['end_date'] ?? null
+        ]);
+        
+        if ($result) {
+            $announcementId = $pdo->lastInsertId();
+            logOperation($_SESSION['admin_id'], 'create', 'announcement', $announcementId, '创建公告: ' . $data['title']);
+            return $announcementId;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("添加公告失败: " . $e->getMessage());
+        return false;
+    }
+}
+
+function updateAnnouncement($id, $data) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE announcements 
+            SET title = ?, content = ?, content_type = ?, is_popup = ?, 
+                popup_duration = ?, is_active = ?, start_date = ?, end_date = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        
+        $result = $stmt->execute([
+            $data['title'],
+            $data['content'],
+            $data['content_type'],
+            $data['is_popup'],
+            $data['popup_duration'],
+            $data['is_active'],
+            $data['start_date'],
+            $data['end_date'],
+            $id
+        ]);
+        
+        if ($result) {
+            logOperation($_SESSION['admin_id'], 'update', 'announcement', $id, '更新公告: ' . $data['title']);
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("更新公告失败: " . $e->getMessage());
+        return false;
+    }
+}
+
+function deleteAnnouncement($id) {
+    global $pdo;
+    
+    try {
+        // 先获取公告信息用于日志
+        $stmt = $pdo->prepare("SELECT title FROM announcements WHERE id = ?");
+        $stmt->execute([$id]);
+        $announcement = $stmt->fetch();
+        
+        if (!$announcement) return false;
+        
+        $stmt = $pdo->prepare("DELETE FROM announcements WHERE id = ?");
+        $result = $stmt->execute([$id]);
+        
+        if ($result) {
+            logOperation($_SESSION['admin_id'], 'delete', 'announcement', $id, '删除公告: ' . $announcement['title']);
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("删除公告失败: " . $e->getMessage());
+        return false;
+    }
+}
+
+function getAnnouncements($page = 1, $limit = 20, $filters = []) {
+    global $pdo;
+    
+    $offset = ($page - 1) * $limit;
+    $where_conditions = [];
+    $params = [];
+    
+    if (isset($filters['is_active'])) {
+        $where_conditions[] = "is_active = ?";
+        $params[] = $filters['is_active'] ? 1 : 0;
+    }
+    
+    if (isset($filters['is_popup'])) {
+        $where_conditions[] = "is_popup = ?";
+        $params[] = $filters['is_popup'] ? 1 : 0;
+    }
+    
+    $where_clause = empty($where_conditions) ? '' : 'WHERE ' . implode(' AND ', $where_conditions);
+    
+    // 获取总数
+    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM announcements $where_clause");
+    $count_stmt->execute($params);
+    $total = $count_stmt->fetchColumn();
+    
+    // 获取数据
+    $stmt = $pdo->prepare("
+        SELECT * FROM announcements 
+        $where_clause 
+        ORDER BY created_at DESC 
+        LIMIT ? OFFSET ?
+    ");
+    
+    $params[] = $limit;
+    $params[] = $offset;
+    $stmt->execute($params);
+    
+    return [
+        'data' => $stmt->fetchAll(),
+        'total' => $total,
+        'page' => $page,
+        'limit' => $limit,
+        'pages' => ceil($total / $limit)
+    ];
+}
+
 function getActiveAnnouncements() {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("SELECT * FROM announcements WHERE is_active = TRUE ORDER BY priority DESC, created_at DESC");
+    global $pdo;
+    
+    $stmt = $pdo->prepare("
+        SELECT * FROM announcements 
+        WHERE is_active = 1 
+        AND (start_date IS NULL OR start_date <= CURRENT_TIMESTAMP)
+        AND (end_date IS NULL OR end_date >= CURRENT_TIMESTAMP)
+        ORDER BY created_at DESC
+    ");
+    
     $stmt->execute();
     return $stmt->fetchAll();
 }
 
-function addAnnouncement($title, $content, $content_type = 'html', $is_popup = false, $popup_duration = 5000) {
-    $pdo = getConnection();
-    $stmt = $pdo->prepare("INSERT INTO announcements (title, content, content_type, is_popup, popup_duration) VALUES (?, ?, ?, ?, ?)");
-    return $stmt->execute([$title, $content, $content_type, $is_popup ? 1 : 0, $popup_duration]);
+// =================
+// 管理员管理函数
+// =================
+
+function addAdmin($data) {
+    global $pdo;
+    
+    try {
+        $hashed_password = password_hash($data['password'], PASSWORD_DEFAULT);
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO admins (username, password, email, is_active)
+            VALUES (?, ?, ?, ?)
+        ");
+        
+        $result = $stmt->execute([
+            $data['username'],
+            $hashed_password,
+            $data['email'] ?? null,
+            $data['is_active'] ?? true
+        ]);
+        
+        if ($result) {
+            $adminId = $pdo->lastInsertId();
+            logOperation($_SESSION['admin_id'], 'create', 'admin', $adminId, '创建管理员: ' . $data['username']);
+            return $adminId;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("添加管理员失败: " . $e->getMessage());
+        return false;
+    }
 }
 
+function updateAdminPassword($id, $new_password) {
+    global $pdo;
+    
+    try {
+        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+        
+        $stmt = $pdo->prepare("
+            UPDATE admins 
+            SET password = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        
+        $result = $stmt->execute([$hashed_password, $id]);
+        
+        if ($result) {
+            logOperation($_SESSION['admin_id'], 'update', 'admin', $id, '修改管理员密码');
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("更新管理员密码失败: " . $e->getMessage());
+        return false;
+    }
+}
+
+function getAdmins() {
+    global $pdo;
+    
+    $stmt = $pdo->prepare("
+        SELECT id, username, email, created_at, updated_at, is_active
+        FROM admins 
+        ORDER BY created_at DESC
+    ");
+    
+    $stmt->execute();
+    return $stmt->fetchAll();
+}
+
+// =================
 // 工具函数
+// =================
+
 function getCardTypeName($card_type) {
     $names = [
         'day' => '天卡',
         'week' => '周卡',
         'month' => '月卡',
         'quarter' => '季度卡',
-        'halfyear' => '半年卡',
+        'half_year' => '半年卡',
         'year' => '年卡'
     ];
     
-    return $names[$card_type] ?? $card_type;
+    return $names[$card_type] ?? '未知';
 }
 
-function getCardTypeDays($card_type) {
-    $days = [
-        'day' => 1,
-        'week' => 7,
-        'month' => 30,
-        'quarter' => 90,
-        'halfyear' => 180,
-        'year' => 365
-    ];
-    
-    return $days[$card_type] ?? 30;
-}
-
-function generateShareUrl($share_code) {
-    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    
-    // 检查当前是否在Jahre目录下，如果是则需要跳到上级目录
-    $current_dir = dirname($_SERVER['REQUEST_URI']);
-    if (strpos($current_dir, '/Jahre') !== false) {
-        // 在Jahre目录下，需要返回根目录
-        $base_path = str_replace('/Jahre', '', $current_dir);
-        if ($base_path === '') {
-            $base_path = '';
-        }
-    } else {
-        $base_path = $current_dir;
-    }
-    
-    // 确保路径格式正确
-    $base_path = rtrim($base_path, '/');
-    
-    return "{$protocol}://{$host}{$base_path}/share.php?code={$share_code}";
-}
-
-// 简单的Markdown解析器
 function parseMarkdown($text) {
-    // 这是一个基础的Markdown解析器，可以根据需要扩展
-    $text = htmlspecialchars($text);
-    
-    // 标题
-    $text = preg_replace('/^### (.*$)/m', '<h3>$1</h3>', $text);
-    $text = preg_replace('/^## (.*$)/m', '<h2>$1</h2>', $text);
-    $text = preg_replace('/^# (.*$)/m', '<h1>$1</h1>', $text);
-    
-    // 粗体和斜体
+    // 简单的 Markdown 解析，可以根据需要集成更完善的 Markdown 解析库
+    $text = preg_replace('/^### (.*$)/im', '<h3>$1</h3>', $text);
+    $text = preg_replace('/^## (.*$)/im', '<h2>$1</h2>', $text);
+    $text = preg_replace('/^# (.*$)/im', '<h1>$1</h1>', $text);
     $text = preg_replace('/\*\*(.*?)\*\*/', '<strong>$1</strong>', $text);
     $text = preg_replace('/\*(.*?)\*/', '<em>$1</em>', $text);
-    
-    // 链接
-    $text = preg_replace('/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2">$1</a>', $text);
-    
-    // 换行
-    $text = nl2br($text);
+    $text = preg_replace('/\n/', '<br>', $text);
     
     return $text;
 }
 
-// 安全函数
-function sanitizeInput($input) {
-    return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
-}
-
-function validateEmail($email) {
-    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
-}
-
-function isLoggedIn() {
-    return isset($_SESSION['admin_id']) || isset($_SESSION['user_id']);
-}
-
-function isAdmin() {
-    return isset($_SESSION['admin_id']);
-}
-
-function checkAdminAccess() {
-    if (!isAdmin()) {
-        header('Location: index.php');
-        exit;
+function logOperation($admin_id, $action, $target_type, $target_id, $details = null) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO operation_logs 
+            (admin_id, action, target_type, target_id, details, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $stmt->execute([
+            $admin_id,
+            $action,
+            $target_type,
+            $target_id,
+            $details,
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        ]);
+    } catch (PDOException $e) {
+        error_log("记录操作日志失败: " . $e->getMessage());
     }
 }
 
-// 生成后导出函数
-function exportGeneratedToCSV($share_pages) {
-    $output = "分享码,卡类型,Netflix账号,创建时间\n";
+function getDashboardStats() {
+    global $pdo;
     
-    foreach ($share_pages as $page) {
-        $output .= sprintf(
-            "%s,%s,%s,%s\n",
-            $page['share_code'],
-            getCardTypeName($page['card_type']),
-            $page['netflix_email'] ?? '未知账号',
-            $page['created_at']
-        );
-    }
+    $stats = [];
     
-    return $output;
+    // 账号统计
+    $stmt = $pdo->query("SELECT status, COUNT(*) as count FROM netflix_accounts GROUP BY status");
+    $account_stats = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $stats['accounts'] = [
+        'total' => array_sum($account_stats),
+        'active' => $account_stats['active'] ?? 0,
+        'inactive' => $account_stats['inactive'] ?? 0,
+        'suspended' => $account_stats['suspended'] ?? 0
+    ];
+    
+    // 分享页统计
+    $stmt = $pdo->query("SELECT is_activated, COUNT(*) as count FROM share_pages GROUP BY is_activated");
+    $share_stats = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $stats['shares'] = [
+        'total' => array_sum($share_stats),
+        'activated' => $share_stats[1] ?? 0,
+        'pending' => $share_stats[0] ?? 0
+    ];
+    
+    // 公告统计
+    $stmt = $pdo->query("SELECT COUNT(*) FROM announcements WHERE is_active = 1");
+    $stats['announcements'] = ['active' => $stmt->fetchColumn()];
+    
+    // 今日激活统计
+    $stmt = $pdo->query("SELECT COUNT(*) FROM share_pages WHERE DATE(activated_at) = CURRENT_DATE");
+    $stats['today_activations'] = $stmt->fetchColumn();
+    
+    return $stats;
 }
 
-function exportGeneratedToTXT($share_pages) {
-    $output = "=== 新生成的分享页列表 ===\n\n";
-    
-    foreach ($share_pages as $page) {
-        $share_url = generateShareUrl($page['share_code']);
-        $output .= sprintf(
-            "分享码: %s\n卡类型: %s\nNetflix账号: %s\n分享链接: %s\n创建时间: %s\n\n---\n\n",
-            $page['share_code'],
-            getCardTypeName($page['card_type']),
-            $page['netflix_email'] ?? '未知账号',
-            $share_url,
-            $page['created_at']
-        );
-    }
-    
-    return $output;
-}
+// 设置默认时区
+date_default_timezone_set('Asia/Shanghai');
 ?>
