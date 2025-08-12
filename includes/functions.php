@@ -455,4 +455,39 @@ function checkAdminAccess() {
         exit;
     }
 }
+
+// 生成后导出函数
+function exportGeneratedToCSV($share_pages) {
+    $output = "分享码,卡类型,Netflix账号,创建时间\n";
+    
+    foreach ($share_pages as $page) {
+        $output .= sprintf(
+            "%s,%s,%s,%s\n",
+            $page['share_code'],
+            getCardTypeName($page['card_type']),
+            $page['netflix_email'] ?? '未知账号',
+            $page['created_at']
+        );
+    }
+    
+    return $output;
+}
+
+function exportGeneratedToTXT($share_pages) {
+    $output = "=== 新生成的分享页列表 ===\n\n";
+    
+    foreach ($share_pages as $page) {
+        $share_url = generateShareUrl($page['share_code']);
+        $output .= sprintf(
+            "分享码: %s\n卡类型: %s\nNetflix账号: %s\n分享链接: %s\n创建时间: %s\n\n---\n\n",
+            $page['share_code'],
+            getCardTypeName($page['card_type']),
+            $page['netflix_email'] ?? '未知账号',
+            $share_url,
+            $page['created_at']
+        );
+    }
+    
+    return $output;
+}
 ?>
