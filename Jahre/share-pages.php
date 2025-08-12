@@ -1,4 +1,8 @@
 <?php
+// 临时启用错误显示
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 require_once '../config/database.php';
 require_once '../includes/functions.php';
@@ -305,9 +309,14 @@ $count_sql = "
     LEFT JOIN users u ON sp.user_id = u.id
     {$where_clause}
 ";
-$count_stmt = $pdo->prepare($count_sql);
-$count_stmt->execute($params);
-$total_count = $count_stmt->fetchColumn();
+try {
+    $count_stmt = $pdo->prepare($count_sql);
+    $count_stmt->execute($params);
+    $total_count = $count_stmt->fetchColumn();
+} catch (Exception $e) {
+    $error = '获取分享页总数失败: ' . $e->getMessage();
+    $total_count = 0;
+}
 
 // 获取分享页列表
 $sql = "
@@ -320,9 +329,14 @@ $sql = "
     ORDER BY sp.created_at DESC
     LIMIT {$per_page} OFFSET {$offset}
 ";
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$share_pages = $stmt->fetchAll();
+try {
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $share_pages = $stmt->fetchAll();
+} catch (Exception $e) {
+    $error = '获取分享页列表失败: ' . $e->getMessage();
+    $share_pages = [];
+}
 
 $total_pages = ceil($total_count / $per_page);
 
@@ -920,6 +934,23 @@ try {
                 document.getElementById('batchDeleteForm').submit();
             }
         }
+        
+        // 确认JavaScript完全加载
+        console.log('所有函数已定义 - deleteSharePage:', typeof deleteSharePage, 'updateBatchButtons:', typeof updateBatchButtons);
+        
+        // 页面加载完成后再次确认
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM加载完成，再次检查函数');
+            if (typeof updateBatchButtons === 'undefined') {
+                console.error('updateBatchButtons未定义！');
+            }
+            if (typeof deleteSharePage === 'undefined') {
+                console.error('deleteSharePage未定义！');
+            }
+        });
     </script>
+    
+    <!-- 页面渲染完成标记 -->
+    <div style="display: none;" id="pageComplete">PAGE_RENDER_COMPLETE</div>
 </body>
 </html>
