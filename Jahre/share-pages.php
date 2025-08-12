@@ -184,7 +184,7 @@ if ($_GET['action'] ?? '' === 'export_generated') {
     } else {
         // 获取分享页详细信息
         $pdo = getConnection();
-        $placeholders = str_repeat('?,', count($codes) - 1) . '?';
+        $placeholders = implode(',', array_fill(0, count($codes), '?'));
         $stmt = $pdo->prepare("
             SELECT sp.share_code, sp.card_type, sp.created_at, na.email as netflix_email
             FROM share_pages sp
@@ -314,7 +314,14 @@ $share_pages = $stmt->fetchAll();
 $total_pages = ceil($total_count / $per_page);
 
 // 获取Netflix账号列表用于创建分享页
-$active_accounts = getNetflixAccounts('active');
+try {
+    $active_accounts = getNetflixAccounts('active');
+} catch (Exception $e) {
+    $active_accounts = [];
+    if (empty($error)) {
+        $error = '获取Netflix账号失败: ' . $e->getMessage();
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -623,7 +630,7 @@ $active_accounts = getNetflixAccounts('active');
                                                     <i class="bi bi-eye"></i>
                                                 </a>
                                                 <button class="btn btn-outline-danger btn-sm" 
-                                                        onclick="deleteSharePage(<?php echo $page['id']; ?>)">
+                                                        onclick="deleteSharePage(<?php echo (int)$page['id']; ?>)">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             </div>
