@@ -33,7 +33,13 @@ if ($_POST['action'] ?? '' === 'update_status') {
     $account_id = (int)($_POST['account_id'] ?? 0);
     $status = sanitizeInput($_POST['status'] ?? '');
     
-    if (updateNetflixAccountStatus($account_id, $status)) {
+    // 验证状态值是否有效
+    $valid_statuses = ['active', 'inactive', 'expired', 'banned'];
+    if (!in_array($status, $valid_statuses)) {
+        $error = '无效的状态值';
+    } elseif ($account_id <= 0) {
+        $error = '无效的账号ID';
+    } elseif (updateNetflixAccountStatus($account_id, $status)) {
         $success = '状态更新成功';
     } else {
         $error = '状态更新失败';
@@ -416,7 +422,23 @@ $accounts = getNetflixAccounts();
 
         // 更新状态
         function updateStatus(accountId, status) {
-            if (confirm(`确定要将账号状态设为"${status}"吗？`)) {
+            // 状态名称映射
+            const statusNames = {
+                'active': '活跃',
+                'inactive': '未激活',
+                'expired': '过期',
+                'banned': '封禁'
+            };
+            
+            // 验证状态值
+            const validStatuses = ['active', 'inactive', 'expired', 'banned'];
+            if (!validStatuses.includes(status)) {
+                alert('无效的状态值: ' + status);
+                return;
+            }
+            
+            const statusName = statusNames[status] || status;
+            if (confirm(`确定要将账号状态设为"${statusName}"吗？`)) {
                 document.getElementById('status_account_id').value = accountId;
                 document.getElementById('status_value').value = status;
                 document.getElementById('statusForm').submit();
