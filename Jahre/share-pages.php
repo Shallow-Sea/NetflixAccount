@@ -10,11 +10,12 @@ $success = '';
 
 // 处理创建分享页
 if ($_POST['action'] ?? '' === 'create_share') {
-    $netflix_account_id = (int)($_POST['netflix_account_id'] ?? -1);
+    $netflix_account_id_raw = $_POST['netflix_account_id'] ?? '';
+    $netflix_account_id = is_numeric($netflix_account_id_raw) ? (int)$netflix_account_id_raw : -1;
     $card_type = sanitizeInput($_POST['card_type'] ?? 'month');
     $quantity = (int)($_POST['quantity'] ?? 1);
     
-    if ($netflix_account_id < 0) {
+    if ($netflix_account_id < 0 || $netflix_account_id_raw === '') {
         $error = '请选择Netflix账号分配方式';
     } elseif ($quantity <= 0 || $quantity > 50) {
         $error = '生成数量必须在1-50之间';
@@ -69,6 +70,9 @@ if ($_POST['action'] ?? '' === 'create_share') {
 // 处理批量重新分配账号
 if ($_POST['action'] ?? '' === 'batch_reassign') {
     $share_page_ids = $_POST['share_page_ids'] ?? [];
+    if (is_string($share_page_ids)) {
+        $share_page_ids = explode(',', $share_page_ids);
+    }
     $new_account_id = (int)($_POST['new_account_id'] ?? 0);
     
     if (empty($share_page_ids)) {
@@ -139,6 +143,9 @@ if ($_POST['action'] ?? '' === 'batch_reassign') {
 // 处理批量删除
 if ($_POST['action'] ?? '' === 'batch_delete') {
     $share_page_ids = $_POST['share_page_ids'] ?? [];
+    if (is_string($share_page_ids)) {
+        $share_page_ids = explode(',', $share_page_ids);
+    }
     
     if (empty($share_page_ids)) {
         $error = '请选择要删除的分享页';
@@ -433,8 +440,9 @@ $active_accounts = getNetflixAccounts('active');
                                 <?php foreach ($_SESSION['generated_codes'] as $code): ?>
                                     <div class="col-md-6 mb-2">
                                         <div class="input-group">
-                                            <input type="text" class="form-control" value="<?php echo generateShareUrl($code); ?>" readonly>
-                                            <button class="btn btn-outline-primary" onclick="copyToClipboard('<?php echo generateShareUrl($code); ?>')">
+                                            <?php $generated_url = generateShareUrl($code); ?>
+                                            <input type="text" class="form-control" value="<?php echo htmlspecialchars($generated_url); ?>" readonly>
+                                            <button class="btn btn-outline-primary" onclick="copyToClipboard('<?php echo htmlspecialchars($generated_url, ENT_QUOTES); ?>')">
                                                 <i class="bi bi-clipboard"></i>
                                             </button>
                                         </div>
@@ -552,8 +560,8 @@ $active_accounts = getNetflixAccounts('active');
                                         <td>
                                             <?php $share_url = generateShareUrl($page['share_code']); ?>
                                             <div class="input-group input-group-sm">
-                                                <input type="text" class="form-control" value="<?php echo $share_url; ?>" readonly>
-                                                <button class="btn btn-outline-primary btn-sm" onclick="copyToClipboard('<?php echo $share_url; ?>')">
+                                                <input type="text" class="form-control" value="<?php echo htmlspecialchars($share_url); ?>" readonly>
+                                                <button class="btn btn-outline-primary btn-sm" onclick="copyToClipboard('<?php echo htmlspecialchars($share_url, ENT_QUOTES); ?>')">
                                                     <i class="bi bi-clipboard"></i>
                                                 </button>
                                             </div>

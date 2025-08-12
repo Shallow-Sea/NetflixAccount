@@ -253,7 +253,22 @@ function exportSharePages($format = 'txt', $user_id = null, $card_type = null) {
     $stmt->execute($params);
     $share_pages = $stmt->fetchAll();
     
-    $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/share.php?code=';
+    // 使用generateShareUrl函数来确保正确的URL生成
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'];
+    $current_dir = dirname($_SERVER['REQUEST_URI']);
+    
+    if (strpos($current_dir, '/Jahre') !== false) {
+        $base_path = str_replace('/Jahre', '', $current_dir);
+        if ($base_path === '') {
+            $base_path = '';
+        }
+    } else {
+        $base_path = $current_dir;
+    }
+    
+    $base_path = rtrim($base_path, '/');
+    $base_url = "{$protocol}://{$host}{$base_path}/share.php?code=";
     
     switch ($format) {
         case 'csv':
